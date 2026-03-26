@@ -1,9 +1,9 @@
 # Database Configuration
 DB_SYNCHRONIZE=false
-DB_HOST=localhost
+DB_HOST=postgres
 DB_PORT=5432
-DB_USERNAME=wolframtheta
-DB_PASSWORD=Turticani.0
+DB_USERNAME=postgres
+DB_PASSWORD=lERS3DOl7juUuV6kar8kDgkKY3ms1humWXt2uvqPSdZEgInCyCrqfm0Y8BkHKRN0
 DB_DATABASE=stock_gem
 
 # JWT
