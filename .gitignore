@@ -37,7 +37,6 @@ lerna-debug.log*
 
 # dotenv environment variable files
 .env
-.env.*
 .env.pro
 !.env.example
 !.env.*.example
