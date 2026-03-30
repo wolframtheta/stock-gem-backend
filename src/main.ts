@@ -25,9 +25,6 @@ async function bootstrap() {
   const reflector = app.get(Reflector);
   app.useGlobalGuards(new JwtAuthGuard(reflector));
 
-  // Prefijo global para la API
-  app.setGlobalPrefix('api');
-
   const port = process.env.PORT || 3000;
   await app.listen(port);
   console.log(`Application is running on: http://localhost:${port}/api`);
