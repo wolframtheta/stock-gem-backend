@@ -33,4 +33,4 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", "dist/src/main.js"]
+CMD ["sh", "-c", "node dist/scripts/seed-superadmin.js ; node dist/src/main.js"]
