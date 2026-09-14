@@ -1,11 +1,12 @@
 import { config } from 'dotenv';
 import { join } from 'path';
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
-import { User, UserRole } from '../src/modules/auth/entities/user.entity';
+import { User } from '../src/modules/auth/entities/user.entity';
+import { seedSuperadminIfNoUsers } from '../src/modules/auth/superadmin-seed';
 
 config({ path: join(__dirname, '../.env') });
 config({ path: join(__dirname, '../.env.local') });
+config({ path: join(__dirname, '../.env.pro') });
 
 const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL;
 const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD || 'SuperAdmin123!';
@@ -31,23 +32,16 @@ async function seedSuperadmin() {
   await dataSource.initialize();
 
   const userRepo = dataSource.getRepository(User);
-  const existing = await userRepo.findOne({ where: { email: SUPERADMIN_EMAIL } });
-
-  if (existing) {
-    console.log(`Usuari ${SUPERADMIN_EMAIL} ja existeix.`);
-    await dataSource.destroy();
-    process.exit(0);
-  }
-
-  const hashedPassword = await bcrypt.hash(SUPERADMIN_PASSWORD, 10);
-  await userRepo.save({
+  const created = await seedSuperadminIfNoUsers(userRepo, {
     email: SUPERADMIN_EMAIL,
-    password: hashedPassword,
+    password: SUPERADMIN_PASSWORD,
     name: SUPERADMIN_NAME,
-    role: UserRole.ADMIN,
   });
 
-  console.log(`Superadmin creat: ${SUPERADMIN_EMAIL}`);
+  if (!created) {
+    console.log('Ja existeixen usuaris — saltant seed.');
+  }
+
   await dataSource.destroy();
   process.exit(0);
 }
