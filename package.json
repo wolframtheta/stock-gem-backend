@@ -1,13 +1,7 @@
 {
   "name": "stock-gem-backend",
   "version": "0.0.1",
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@nestjs/core",
-      "bcrypt",
-      "unrs-resolver"
-    ]
-  },
+  "packageManager": "pnpm@10.30.2",
   "description": "",
   "author": "",
   "private": true,

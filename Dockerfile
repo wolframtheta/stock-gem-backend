@@ -4,11 +4,11 @@ FROM node:24-alpine AS builder
 # bcrypt (node-gyp) a Alpine
 RUN apk add --no-cache python3 make g++
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.30.2 --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
@@ -19,11 +19,11 @@ FROM node:24-alpine
 
 RUN apk add --no-cache --virtual .build-deps python3 make g++
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.30.2 --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --prod \
   && apk del .build-deps
 
