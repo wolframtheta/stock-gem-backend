@@ -5,6 +5,7 @@ import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto, LogoutDto } from './dto/refresh-token.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { Public } from './decorators/public.decorator';
+import { AuthRateLimit } from './decorators/auth-rate-limit.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { User } from './entities/user.entity';
@@ -13,24 +14,28 @@ import { User } from './entities/user.entity';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @AuthRateLimit()
   @Public()
   @Post('register')
   async register(@Body() registerDto: RegisterDto): Promise<AuthResponseDto> {
     return this.authService.register(registerDto);
   }
 
+  @AuthRateLimit()
   @Public()
   @Post('login')
   async login(@Body() loginDto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(loginDto);
   }
 
+  @AuthRateLimit()
   @Public()
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto): Promise<AuthResponseDto> {
     return this.authService.refresh(dto.refreshToken);
   }
 
+  @AuthRateLimit()
   @Public()
   @Post('revoke')
   async revoke(@Body() dto: RefreshTokenDto) {
