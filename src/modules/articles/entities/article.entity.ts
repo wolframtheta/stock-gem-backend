@@ -12,8 +12,8 @@ export class Article extends BaseEntity {
   @Column({ type: 'text' })
   description: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  cost: number;
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  cost: number | null;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
   pvp: number;

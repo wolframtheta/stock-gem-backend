@@ -22,6 +22,7 @@
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli",
     "migration:generate": "pnpm typeorm migration:generate -d src/data-source.ts",
     "migration:run": "pnpm typeorm migration:run -d src/data-source.ts",
+    "migration:show": "pnpm typeorm migration:show -d src/data-source.ts",
     "migration:revert": "pnpm typeorm migration:revert -d src/data-source.ts",
     "migration:create": "pnpm typeorm migration:create",
     "seed:superadmin": "ts-node -r tsconfig-paths/register scripts/seed-superadmin.ts"

@@ -6,6 +6,7 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -19,10 +20,12 @@ export class CreateArticleDto {
   @IsNotEmpty()
   description: string;
 
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsNumber()
   @Type(() => Number)
   @Min(0)
-  cost: number;
+  cost?: number | null;
 
   @IsNumber()
   @Type(() => Number)

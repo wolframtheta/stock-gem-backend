@@ -1,4 +1,4 @@
-import { IsInt, IsDateString, Min } from 'class-validator';
+import { IsInt, IsDateString, IsNumber, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class AddStockDto {
@@ -9,4 +9,14 @@ export class AddStockDto {
 
   @IsDateString()
   date: string;
+
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  cost: number;
+
+  @IsNumber()
+  @Type(() => Number)
+  @Min(0)
+  pvp: number;
 }

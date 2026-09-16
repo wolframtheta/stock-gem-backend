@@ -62,7 +62,7 @@ export class ConfigService {
 
   async findOneArticleType(id: string): Promise<ArticleType> {
     const t = await this.articleTypeRepository.findOne({ where: { id } });
-    if (!t) throw new NotFoundException(`Tipus d'article no trobat`);
+    if (!t) throw new NotFoundException(`Tipus de peça no trobat`);
     return t;
   }
 

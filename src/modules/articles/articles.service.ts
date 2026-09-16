@@ -12,6 +12,7 @@ import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { SearchArticleDto } from './dto/search-article.dto';
 import { AddStockDto } from './dto/add-stock.dto';
+import { shouldRecordPriceHistory } from './articles-pricing.util';
 import { SalesPointStock } from '../sales-points/entities/sales-point-stock.entity';
 import { FairStock } from '../fairs/entities/fair-stock.entity';
 import { Collection } from '../config/entities/collection.entity';
@@ -88,13 +89,14 @@ export class ArticlesService {
       });
       if (!articleType) {
         throw new NotFoundException(
-          `Tipus d'article amb ID ${createArticleDto.articleTypeId} no trobat`,
+          `Tipus de peça amb ID ${createArticleDto.articleTypeId} no trobat`,
         );
       }
     }
 
     const article = this.articleRepository.create({
       ...createArticleDto,
+      cost: createArticleDto.cost ?? null,
       stock: createArticleDto.stock ?? 0,
       collection: collection || null,
       articleType: articleType || null,
@@ -234,7 +236,7 @@ export class ArticlesService {
         const t = await this.articleTypeRepository.findOne({
           where: { id: updateArticleDto.articleTypeId },
         });
-        if (!t) throw new NotFoundException("Tipus d'article no trobat");
+        if (!t) throw new NotFoundException('Tipus de peça no trobat');
         article.articleType = t;
         article.articleTypeId = t.id;
       }
@@ -252,7 +254,7 @@ export class ArticlesService {
 
     if (
       updateArticleDto.pvp !== undefined &&
-      Number(updateArticleDto.pvp) !== Number(oldPvp)
+      shouldRecordPriceHistory(oldPvp, Number(updateArticleDto.pvp))
     ) {
       await this.priceHistoryRepository.save(
         this.priceHistoryRepository.create({
@@ -489,6 +491,7 @@ export class ArticlesService {
     const article = await this.findOne(id);
     const qty = dto.quantity;
     const recordedAt = new Date(dto.date);
+    const oldPvp = Number(article.pvp);
 
     await this.stockHistoryRepository.save(
       this.stockHistoryRepository.create({
@@ -499,7 +502,19 @@ export class ArticlesService {
     );
 
     article.stock += qty;
+    article.cost = dto.cost;
+    article.pvp = dto.pvp;
     await this.articleRepository.save(article);
+
+    if (shouldRecordPriceHistory(oldPvp, dto.pvp)) {
+      await this.priceHistoryRepository.save(
+        this.priceHistoryRepository.create({
+          articleId: id,
+          price: dto.pvp,
+          changedAt: recordedAt,
+        }),
+      );
+    }
 
     const warehouse = await this.salesPointsService.getDefaultWarehouse();
     if (warehouse) {
