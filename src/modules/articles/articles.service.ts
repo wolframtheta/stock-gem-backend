@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Article } from './entities/article.entity';
+import { ArticlePhoto } from './entities/article-photo.entity';
 import { ArticlePriceHistory } from './entities/article-price-history.entity';
 import { ArticleStockHistory } from './entities/article-stock-history.entity';
 import { CreateArticleDto } from './dto/create-article.dto';
@@ -43,6 +44,8 @@ export class ArticlesService {
   constructor(
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
+    @InjectRepository(ArticlePhoto)
+    private articlePhotoRepository: Repository<ArticlePhoto>,
     @InjectRepository(ArticlePriceHistory)
     private priceHistoryRepository: Repository<ArticlePriceHistory>,
     @InjectRepository(ArticleStockHistory)
@@ -94,15 +97,25 @@ export class ArticlesService {
       }
     }
 
+    const { photoPaths, photo, ...articleData } = createArticleDto;
+    const primaryPhoto = photoPaths?.[0] ?? photo ?? null;
+
     const article = this.articleRepository.create({
-      ...createArticleDto,
+      ...articleData,
       cost: createArticleDto.cost ?? null,
       stock: createArticleDto.stock ?? 0,
+      photo: primaryPhoto,
       collection: collection || null,
       articleType: articleType || null,
     });
 
     const saved = await this.articleRepository.save(article);
+
+    if (photoPaths !== undefined) {
+      await this.syncArticlePhotos(saved.id, photoPaths);
+    } else if (primaryPhoto) {
+      await this.syncArticlePhotos(saved.id, [primaryPhoto]);
+    }
 
     if (saved.pvp > 0) {
       await this.priceHistoryRepository.save(
@@ -167,12 +180,12 @@ export class ArticlesService {
     }
     const article = await this.articleRepository.findOne({
       where: { id },
-      relations: ['collection', 'articleType'],
+      relations: ['collection', 'articleType', 'photos'],
     });
     if (!article) {
       throw new NotFoundException(`Article with ID ${id} not found`);
     }
-    return article;
+    return this.sortArticlePhotos(article);
   }
 
   private async findOneForFair(
@@ -186,10 +199,39 @@ export class ArticlesService {
     if (!fairStock) {
       throw new NotFoundException(`Article with ID ${id} not found`);
     }
+    const withPhotos = await this.articleRepository.findOne({
+      where: { id: fairStock.article.id },
+      relations: ['collection', 'articleType', 'photos'],
+    });
     return {
-      ...fairStock.article,
+      ...this.sortArticlePhotos(withPhotos ?? fairStock.article),
       quantityAtFair: fairStock.quantity,
     };
+  }
+
+  private sortArticlePhotos<T extends Article>(article: T): T {
+    if (article.photos?.length) {
+      article.photos.sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+    return article;
+  }
+
+  private async syncArticlePhotos(
+    articleId: string,
+    paths: string[],
+  ): Promise<void> {
+    await this.articlePhotoRepository.delete({ articleId });
+    if (paths.length === 0) {
+      return;
+    }
+    const rows = paths.map((path, index) =>
+      this.articlePhotoRepository.create({
+        articleId,
+        path,
+        sortOrder: index,
+      }),
+    );
+    await this.articlePhotoRepository.save(rows);
   }
 
   async update(
@@ -244,8 +286,22 @@ export class ArticlesService {
 
     const oldPvp = article.pvp;
     const oldStock = article.stock;
+    const { photoPaths, photo, ...updateData } = updateArticleDto;
+
+    if (photoPaths !== undefined) {
+      article.photo = photoPaths[0] ?? null;
+      await this.syncArticlePhotos(id, photoPaths);
+    } else if (photo !== undefined) {
+      article.photo = photo ?? null;
+      if (photo) {
+        await this.syncArticlePhotos(id, [photo]);
+      } else {
+        await this.syncArticlePhotos(id, []);
+      }
+    }
+
     Object.assign(article, {
-      ...updateArticleDto,
+      ...updateData,
       collectionId: undefined,
       articleTypeId: undefined,
     });

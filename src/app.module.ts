@@ -18,6 +18,7 @@ import { UsersModule } from './modules/users/users.module';
 import { PlatformConfigModule } from './modules/config/config.module';
 import { FairsModule } from './modules/fairs/fairs.module';
 import { StatisticsModule } from './modules/statistics/statistics.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
     SalesModule,
     PersonalizationsModule,
     AlbaranesModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

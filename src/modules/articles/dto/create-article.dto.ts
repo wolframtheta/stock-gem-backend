@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsNumber,
   IsUUID,
+  IsArray,
   MaxLength,
   Min,
   ValidateIf,
@@ -46,6 +47,12 @@ export class CreateArticleDto {
   @IsOptional()
   @MaxLength(500)
   photo?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @MaxLength(500, { each: true })
+  photoPaths?: string[];
 
   @IsUUID()
   @IsOptional()

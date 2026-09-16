@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArticlesService } from './articles.service';
 import { ArticlesController } from './articles.controller';
 import { Article } from './entities/article.entity';
+import { ArticlePhoto } from './entities/article-photo.entity';
 import { ArticlePriceHistory } from './entities/article-price-history.entity';
 import { ArticleStockHistory } from './entities/article-stock-history.entity';
 import { SalesPointStock } from '../sales-points/entities/sales-point-stock.entity';
@@ -16,6 +17,7 @@ import { SalesPointsModule } from '../sales-points/sales-points.module';
   imports: [
     TypeOrmModule.forFeature([
       Article,
+      ArticlePhoto,
       ArticlePriceHistory,
       ArticleStockHistory,
       SalesPointStock,

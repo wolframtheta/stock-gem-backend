@@ -1,7 +1,15 @@
-import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
+import {
+  Entity,
+  Column,
+  Index,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
+} from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Collection } from '../../config/entities/collection.entity';
 import { ArticleType } from '../../config/entities/article-type.entity';
+import { ArticlePhoto } from './article-photo.entity';
 
 @Entity('articles')
 @Index('idx_articles_own_reference', ['ownReference'])
@@ -40,4 +48,7 @@ export class Article extends BaseEntity {
 
   @Column({ name: 'article_type_id', nullable: true })
   articleTypeId: string | null;
+
+  @OneToMany(() => ArticlePhoto, (photo) => photo.article)
+  photos: ArticlePhoto[];
 }
