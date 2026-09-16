@@ -5,11 +5,16 @@ import {
   IsNumber,
   IsUUID,
   IsArray,
+  IsBoolean,
   MaxLength,
   Min,
   ValidateIf,
+  ValidateNested,
+  ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ArticleSizeInputDto } from './article-size-input.dto';
 
 export class CreateArticleDto {
   @IsString()
@@ -50,6 +55,7 @@ export class CreateArticleDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(1)
   @IsString({ each: true })
   @MaxLength(500, { each: true })
   photoPaths?: string[];
@@ -61,4 +67,16 @@ export class CreateArticleDto {
   @IsUUID()
   @IsOptional()
   articleTypeId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  hasSizes?: boolean;
+
+  @ValidateIf((o) => o.hasSizes === true)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ArticleSizeInputDto)
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  sizes?: ArticleSizeInputDto[];
 }

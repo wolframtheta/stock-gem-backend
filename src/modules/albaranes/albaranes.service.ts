@@ -60,6 +60,11 @@ export class AlbaranesService {
           `Artículo con ID ${itemDto.articleId} no encontrado`,
         );
       }
+      if (article.hasSizes) {
+        throw new ConflictException(
+          'Article amb talles: ajustar via formulari',
+        );
+      }
     }
 
     // Crear el albarán
@@ -249,6 +254,11 @@ export class AlbaranesService {
         if (!article) {
           throw new NotFoundException(
             `Artículo con ID ${itemDto.articleId} no encontrado`,
+          );
+        }
+        if (article.hasSizes) {
+          throw new ConflictException(
+            'Article amb talles: ajustar via formulari',
           );
         }
 
