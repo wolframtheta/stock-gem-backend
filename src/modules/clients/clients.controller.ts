@@ -54,4 +54,3 @@ export class ClientsController {
     return this.clientsService.remove(id);
   }
 }
-

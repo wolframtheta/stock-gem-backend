@@ -8,7 +8,7 @@ import {
   MaxLength,
 } from 'class-validator';
 
-export class UpdateComposturaDto {
+export class UpdatePersonalizationDto {
   @IsString()
   @IsOptional()
   @MaxLength(50)
@@ -20,11 +20,11 @@ export class UpdateComposturaDto {
 
   @IsUUID()
   @IsOptional()
-  workshopId?: string;
+  workshopId?: string | null;
 
   @IsUUID()
   @IsOptional()
-  composturaTypeId?: string | null;
+  personalizationTypeId?: string | null;
 
   @IsString()
   @IsOptional()
@@ -40,15 +40,15 @@ export class UpdateComposturaDto {
 
   @IsDateString()
   @IsOptional()
-  deliveryToWorkshopDate?: string;
+  deliveryToWorkshopDate?: string | null;
 
   @IsDateString()
   @IsOptional()
-  exitFromWorkshopDate?: string;
+  exitFromWorkshopDate?: string | null;
 
   @IsDateString()
   @IsOptional()
-  deliveryToClientDate?: string;
+  deliveryToClientDate?: string | null;
 
   @IsNumber()
   @Min(0)
@@ -70,4 +70,3 @@ export class UpdateComposturaDto {
   @MaxLength(500)
   photo?: string;
 }
-

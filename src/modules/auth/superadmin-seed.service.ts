@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { User } from './entities/user.entity';
+import { assertSuperadminPassword } from '../../config/superadmin-password.util';
 import { seedSuperadminIfNoUsers } from './superadmin-seed';
 
 @Injectable()
@@ -22,9 +23,9 @@ export class SuperadminSeedService implements OnModuleInit {
 
     await seedSuperadminIfNoUsers(this.userRepository, {
       email,
-      password:
-        this.configService.get<string>('SUPERADMIN_PASSWORD') ||
-        'SuperAdmin123!',
+      password: assertSuperadminPassword(
+        this.configService.get<string>('SUPERADMIN_PASSWORD'),
+      ),
       name: this.configService.get<string>('SUPERADMIN_NAME') || 'Super Admin',
     });
   }

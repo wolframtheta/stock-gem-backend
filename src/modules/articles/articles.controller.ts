@@ -33,10 +33,7 @@ export class ArticlesController {
   }
 
   @Get()
-  findAll(
-    @Query() searchDto: SearchArticleDto,
-    @CurrentUser() user: User,
-  ) {
+  findAll(@Query() searchDto: SearchArticleDto, @CurrentUser() user: User) {
     const hasSearchParams = Object.keys(searchDto).some(
       (key) => searchDto[key] !== undefined && searchDto[key] !== '',
     );
@@ -54,10 +51,7 @@ export class ArticlesController {
   }
 
   @Get(':id/stock-breakdown')
-  getStockBreakdown(
-    @Param('id') id: string,
-    @CurrentUser() user: User,
-  ) {
+  getStockBreakdown(@Param('id') id: string, @CurrentUser() user: User) {
     return this.articlesService.getStockBreakdown(id, user);
   }
 
@@ -83,10 +77,7 @@ export class ArticlesController {
   @Patch(':id/stock')
   @UseGuards(RolesGuard)
   @Roles(UserRole.ADMIN)
-  updateStock(
-    @Param('id') id: string,
-    @Body('quantity') quantity: number,
-  ) {
+  updateStock(@Param('id') id: string, @Body('quantity') quantity: number) {
     return this.articlesService.updateStock(id, quantity);
   }
 
@@ -115,4 +106,3 @@ export class ArticlesController {
     );
   }
 }
-

@@ -177,7 +177,10 @@ export class AlbaranesService {
     return queryBuilder.getMany();
   }
 
-  async update(id: string, updateAlbaranDto: UpdateAlbaranDto): Promise<Albaran> {
+  async update(
+    id: string,
+    updateAlbaranDto: UpdateAlbaranDto,
+  ): Promise<Albaran> {
     const albaran = await this.findOne(id);
 
     // Verificar número único si se actualiza
@@ -291,4 +294,3 @@ export class AlbaranesService {
     await this.albaranRepository.remove(albaran);
   }
 }
-

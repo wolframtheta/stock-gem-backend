@@ -11,4 +11,3 @@ import { Supplier } from './entities/supplier.entity';
   exports: [SuppliersService],
 })
 export class SuppliersModule {}
-

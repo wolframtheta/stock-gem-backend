@@ -89,9 +89,7 @@ export class AddSalesPoints1730650000000 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "sales" DROP CONSTRAINT "FK_sales_sales_point"`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "sales" DROP COLUMN "sales_point_id"`,
-    );
+    await queryRunner.query(`ALTER TABLE "sales" DROP COLUMN "sales_point_id"`);
     await queryRunner.query(`DROP TABLE "sales_point_stock"`);
     await queryRunner.query(`DROP TABLE "sales_points"`);
   }

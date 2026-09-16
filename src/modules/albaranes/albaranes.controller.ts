@@ -45,10 +45,7 @@ export class AlbaranesController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id') id: string,
-    @Body() updateAlbaranDto: UpdateAlbaranDto,
-  ) {
+  update(@Param('id') id: string, @Body() updateAlbaranDto: UpdateAlbaranDto) {
     return this.albaranesService.update(id, updateAlbaranDto);
   }
 
@@ -57,4 +54,3 @@ export class AlbaranesController {
     return this.albaranesService.remove(id);
   }
 }
-

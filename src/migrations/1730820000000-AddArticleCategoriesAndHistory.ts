@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddArticleCategoriesAndHistory1730820000000
-  implements MigrationInterface
-{
+export class AddArticleCategoriesAndHistory1730820000000 implements MigrationInterface {
   name = 'AddArticleCategoriesAndHistory1730820000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

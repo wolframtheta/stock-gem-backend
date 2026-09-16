@@ -13,8 +13,8 @@ import { CreateCollectionDto } from './dto/create-collection.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
 import { CreateArticleTypeDto } from './dto/create-article-type.dto';
 import { UpdateArticleTypeDto } from './dto/update-article-type.dto';
-import { CreateComposturaTypeDto } from './dto/create-compostura-type.dto';
-import { UpdateComposturaTypeDto } from './dto/update-compostura-type.dto';
+import { CreatePersonalizationTypeDto } from './dto/create-personalization-type.dto';
+import { UpdatePersonalizationTypeDto } from './dto/update-personalization-type.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -43,10 +43,7 @@ export class ConfigController {
   }
 
   @Patch('collections/:id')
-  updateCollection(
-    @Param('id') id: string,
-    @Body() dto: UpdateCollectionDto,
-  ) {
+  updateCollection(@Param('id') id: string, @Body() dto: UpdateCollectionDto) {
     return this.configService.updateCollection(id, dto);
   }
 
@@ -84,32 +81,32 @@ export class ConfigController {
     return this.configService.removeArticleType(id);
   }
 
-  // Compostura types
-  @Get('compostura-types')
-  findAllComposturaTypes() {
-    return this.configService.findAllComposturaTypes();
+  // Personalization types
+  @Get('personalization-types')
+  findAllPersonalizationTypes() {
+    return this.configService.findAllPersonalizationTypes();
   }
 
-  @Get('compostura-types/:id')
-  findOneComposturaType(@Param('id') id: string) {
-    return this.configService.findOneComposturaType(id);
+  @Get('personalization-types/:id')
+  findOnePersonalizationType(@Param('id') id: string) {
+    return this.configService.findOnePersonalizationType(id);
   }
 
-  @Post('compostura-types')
-  createComposturaType(@Body() dto: CreateComposturaTypeDto) {
-    return this.configService.createComposturaType(dto);
+  @Post('personalization-types')
+  createPersonalizationType(@Body() dto: CreatePersonalizationTypeDto) {
+    return this.configService.createPersonalizationType(dto);
   }
 
-  @Patch('compostura-types/:id')
-  updateComposturaType(
+  @Patch('personalization-types/:id')
+  updatePersonalizationType(
     @Param('id') id: string,
-    @Body() dto: UpdateComposturaTypeDto,
+    @Body() dto: UpdatePersonalizationTypeDto,
   ) {
-    return this.configService.updateComposturaType(id, dto);
+    return this.configService.updatePersonalizationType(id, dto);
   }
 
-  @Delete('compostura-types/:id')
-  removeComposturaType(@Param('id') id: string) {
-    return this.configService.removeComposturaType(id);
+  @Delete('personalization-types/:id')
+  removePersonalizationType(@Param('id') id: string) {
+    return this.configService.removePersonalizationType(id);
   }
 }

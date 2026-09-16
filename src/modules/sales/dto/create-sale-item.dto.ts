@@ -25,4 +25,3 @@ export class CreateSaleItemDto {
   @Type(() => Number)
   totalPrice: number;
 }
-

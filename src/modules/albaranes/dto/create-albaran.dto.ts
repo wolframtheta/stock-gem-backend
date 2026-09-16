@@ -33,4 +33,3 @@ export class CreateAlbaranDto {
   @Type(() => CreateAlbaranItemDto)
   items: CreateAlbaranItemDto[];
 }
-

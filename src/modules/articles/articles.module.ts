@@ -5,7 +5,6 @@ import { ArticlesController } from './articles.controller';
 import { Article } from './entities/article.entity';
 import { ArticlePriceHistory } from './entities/article-price-history.entity';
 import { ArticleStockHistory } from './entities/article-stock-history.entity';
-import { Supplier } from '../suppliers/entities/supplier.entity';
 import { SalesPointStock } from '../sales-points/entities/sales-point-stock.entity';
 import { SalesPoint } from '../sales-points/entities/sales-point.entity';
 import { Collection } from '../config/entities/collection.entity';
@@ -19,7 +18,6 @@ import { SalesPointsModule } from '../sales-points/sales-points.module';
       Article,
       ArticlePriceHistory,
       ArticleStockHistory,
-      Supplier,
       SalesPointStock,
       SalesPoint,
       Collection,
@@ -33,4 +31,3 @@ import { SalesPointsModule } from '../sales-points/sales-points.module';
   exports: [ArticlesService],
 })
 export class ArticlesModule {}
-

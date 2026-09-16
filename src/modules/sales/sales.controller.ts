@@ -61,4 +61,3 @@ export class SalesController {
     return this.salesService.remove(id);
   }
 }
-

@@ -9,7 +9,7 @@ import {
   MaxLength,
 } from 'class-validator';
 
-export class CreateComposturaDto {
+export class CreatePersonalizationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(50)
@@ -25,7 +25,7 @@ export class CreateComposturaDto {
 
   @IsUUID()
   @IsOptional()
-  composturaTypeId?: string;
+  personalizationTypeId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -71,4 +71,3 @@ export class CreateComposturaDto {
   @MaxLength(500)
   photo?: string;
 }
-

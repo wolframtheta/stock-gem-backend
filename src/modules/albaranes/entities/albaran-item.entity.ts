@@ -36,4 +36,3 @@ export class AlbaranItem extends BaseEntity {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   pvp: number;
 }
-

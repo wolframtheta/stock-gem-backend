@@ -7,7 +7,7 @@ import { SaleItem } from '../sales/entities/sale-item.entity';
 import { ArticleStockHistory } from '../articles/entities/article-stock-history.entity';
 import { SalesPoint } from '../sales-points/entities/sales-point.entity';
 import { Fair } from '../fairs/entities/fair.entity';
-import { Compostura } from '../composturas/entities/compostura.entity';
+import { Personalization } from '../personalizations/entities/personalization.entity';
 
 @Module({
   imports: [
@@ -17,7 +17,7 @@ import { Compostura } from '../composturas/entities/compostura.entity';
       ArticleStockHistory,
       SalesPoint,
       Fair,
-      Compostura,
+      Personalization,
     ]),
   ],
   controllers: [StatisticsController],

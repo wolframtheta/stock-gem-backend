@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 
-export class CreateComposturaTypeDto {
+export class CreatePersonalizationTypeDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)

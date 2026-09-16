@@ -1,15 +1,19 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Collection } from './entities/collection.entity';
 import { ArticleType } from './entities/article-type.entity';
-import { ComposturaType } from './entities/compostura-type.entity';
+import { PersonalizationType } from './entities/personalization-type.entity';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { UpdateCollectionDto } from './dto/update-collection.dto';
 import { CreateArticleTypeDto } from './dto/create-article-type.dto';
 import { UpdateArticleTypeDto } from './dto/update-article-type.dto';
-import { CreateComposturaTypeDto } from './dto/create-compostura-type.dto';
-import { UpdateComposturaTypeDto } from './dto/update-compostura-type.dto';
+import { CreatePersonalizationTypeDto } from './dto/create-personalization-type.dto';
+import { UpdatePersonalizationTypeDto } from './dto/update-personalization-type.dto';
 
 @Injectable()
 export class ConfigService {
@@ -18,8 +22,8 @@ export class ConfigService {
     private collectionRepository: Repository<Collection>,
     @InjectRepository(ArticleType)
     private articleTypeRepository: Repository<ArticleType>,
-    @InjectRepository(ComposturaType)
-    private composturaTypeRepository: Repository<ComposturaType>,
+    @InjectRepository(PersonalizationType)
+    private personalizationTypeRepository: Repository<PersonalizationType>,
   ) {}
 
   // Collections
@@ -38,15 +42,17 @@ export class ConfigService {
     return this.collectionRepository.save(c);
   }
 
-  async updateCollection(id: string, dto: UpdateCollectionDto): Promise<Collection> {
+  async updateCollection(
+    id: string,
+    dto: UpdateCollectionDto,
+  ): Promise<Collection> {
     const c = await this.findOneCollection(id);
     Object.assign(c, dto);
     return this.collectionRepository.save(c);
   }
 
   async removeCollection(id: string): Promise<void> {
-    const c = await this.findOneCollection(id);
-    await this.collectionRepository.remove(c);
+    throw new ForbiddenException('No es pot eliminar una col·lecció');
   }
 
   // Article types
@@ -75,39 +81,40 @@ export class ConfigService {
   }
 
   async removeArticleType(id: string): Promise<void> {
-    const t = await this.findOneArticleType(id);
-    await this.articleTypeRepository.remove(t);
+    throw new ForbiddenException('No es pot eliminar un tipus de peça');
   }
 
-  // Compostura types
-  async findAllComposturaTypes(): Promise<ComposturaType[]> {
-    return this.composturaTypeRepository.find({ order: { name: 'ASC' } });
+  // Personalization types
+  async findAllPersonalizationTypes(): Promise<PersonalizationType[]> {
+    return this.personalizationTypeRepository.find({ order: { name: 'ASC' } });
   }
 
-  async findOneComposturaType(id: string): Promise<ComposturaType> {
-    const t = await this.composturaTypeRepository.findOne({ where: { id } });
-    if (!t) throw new NotFoundException(`Tipus de compostura no trobat`);
+  async findOnePersonalizationType(id: string): Promise<PersonalizationType> {
+    const t = await this.personalizationTypeRepository.findOne({
+      where: { id },
+    });
+    if (!t) throw new NotFoundException(`Tipus de personalització no trobat`);
     return t;
   }
 
-  async createComposturaType(
-    dto: CreateComposturaTypeDto,
-  ): Promise<ComposturaType> {
-    const t = this.composturaTypeRepository.create(dto);
-    return this.composturaTypeRepository.save(t);
+  async createPersonalizationType(
+    dto: CreatePersonalizationTypeDto,
+  ): Promise<PersonalizationType> {
+    const t = this.personalizationTypeRepository.create(dto);
+    return this.personalizationTypeRepository.save(t);
   }
 
-  async updateComposturaType(
+  async updatePersonalizationType(
     id: string,
-    dto: UpdateComposturaTypeDto,
-  ): Promise<ComposturaType> {
-    const t = await this.findOneComposturaType(id);
+    dto: UpdatePersonalizationTypeDto,
+  ): Promise<PersonalizationType> {
+    const t = await this.findOnePersonalizationType(id);
     Object.assign(t, dto);
-    return this.composturaTypeRepository.save(t);
+    return this.personalizationTypeRepository.save(t);
   }
 
-  async removeComposturaType(id: string): Promise<void> {
-    const t = await this.findOneComposturaType(id);
-    await this.composturaTypeRepository.remove(t);
+  async removePersonalizationType(id: string): Promise<void> {
+    const t = await this.findOnePersonalizationType(id);
+    await this.personalizationTypeRepository.remove(t);
   }
 }

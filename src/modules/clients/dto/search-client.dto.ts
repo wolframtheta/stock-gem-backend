@@ -11,10 +11,14 @@ export class SearchClientDto {
 
   @IsString()
   @IsOptional()
-  mobilePhone?: string;
+  email?: string;
 
   @IsString()
   @IsOptional()
-  landlinePhone?: string;
-}
+  mobilePhone?: string;
 
+  /** Cerca lliure: nom, cognoms, email, mòbil */
+  @IsString()
+  @IsOptional()
+  q?: string;
+}

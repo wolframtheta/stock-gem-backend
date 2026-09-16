@@ -71,7 +71,9 @@ export class AddFairs1730840000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`DROP INDEX "idx_users_fair_id"`);
-    await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_users_fair"`);
+    await queryRunner.query(
+      `ALTER TABLE "users" DROP CONSTRAINT "FK_users_fair"`,
+    );
     await queryRunner.query(`ALTER TABLE "users" DROP COLUMN "fair_id"`);
 
     await queryRunner.query(`DROP INDEX "idx_sales_fair_id"`);

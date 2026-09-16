@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Supplier } from './entities/supplier.entity';
@@ -71,8 +75,7 @@ export class SuppliersService {
   }
 
   async search(searchDto: SearchSupplierDto): Promise<Supplier[]> {
-    const queryBuilder =
-      this.supplierRepository.createQueryBuilder('supplier');
+    const queryBuilder = this.supplierRepository.createQueryBuilder('supplier');
 
     if (searchDto.name) {
       queryBuilder.andWhere(
@@ -95,4 +98,3 @@ export class SuppliersService {
     return queryBuilder.getMany();
   }
 }
-

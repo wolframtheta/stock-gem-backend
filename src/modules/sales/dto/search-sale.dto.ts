@@ -26,4 +26,3 @@ export class SearchSaleDto {
   @IsEnum(PaymentType)
   paymentType?: PaymentType;
 }
-

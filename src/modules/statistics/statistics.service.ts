@@ -6,7 +6,7 @@ import { SaleItem } from '../sales/entities/sale-item.entity';
 import { ArticleStockHistory } from '../articles/entities/article-stock-history.entity';
 import { SalesPoint } from '../sales-points/entities/sales-point.entity';
 import { Fair } from '../fairs/entities/fair.entity';
-import { Compostura } from '../composturas/entities/compostura.entity';
+import { Personalization } from '../personalizations/entities/personalization.entity';
 
 export interface SalesByStoreRow {
   id: string;
@@ -65,8 +65,8 @@ export class StatisticsService {
     private salesPointRepository: Repository<SalesPoint>,
     @InjectRepository(Fair)
     private fairRepository: Repository<Fair>,
-    @InjectRepository(Compostura)
-    private composturaRepository: Repository<Compostura>,
+    @InjectRepository(Personalization)
+    private personalizationRepository: Repository<Personalization>,
   ) {}
 
   private parseDateRange(
@@ -117,16 +117,15 @@ export class StatisticsService {
 
   private buildTimeSeriesResponse(
     periods: string[],
-    seriesMap: Map<
-      string,
-      { label: string; amounts: Record<string, number> }
-    >,
+    seriesMap: Map<string, { label: string; amounts: Record<string, number> }>,
   ): TimeSeriesResponse {
-    const series = Array.from(seriesMap.entries()).map(([id, { label, amounts }]) => ({
-      id,
-      label,
-      data: periods.map((p) => amounts[p] ?? 0),
-    }));
+    const series = Array.from(seriesMap.entries()).map(
+      ([id, { label, amounts }]) => ({
+        id,
+        label,
+        data: periods.map((p) => amounts[p] ?? 0),
+      }),
+    );
     return { periods, series };
   }
 
@@ -224,10 +223,7 @@ export class StatisticsService {
     };
   }
 
-  async getSalesByFair(
-    from?: string,
-    to?: string,
-  ): Promise<SalesByFairRow[]> {
+  async getSalesByFair(from?: string, to?: string): Promise<SalesByFairRow[]> {
     const { start, end } = this.parseDateRange(from, to);
 
     const sales = await this.saleRepository
@@ -324,7 +320,9 @@ export class StatisticsService {
     >();
     for (const r of rows) {
       const p = pointMap.get(r.id);
-      const label = p ? `${p.name}${p.code ? ` (${p.code})` : ''}` : 'Desconegut';
+      const label = p
+        ? `${p.name}${p.code ? ` (${p.code})` : ''}`
+        : 'Desconegut';
       if (!seriesMap.has(r.id)) {
         seriesMap.set(r.id, { label, amounts: {} });
       }
@@ -549,7 +547,7 @@ export class StatisticsService {
     return this.buildTimeSeriesResponse(periods, seriesMap);
   }
 
-  async getFairComposturasTimeSeries(
+  async getFairPersonalizationsTimeSeries(
     fairId: string,
     from?: string,
     to?: string,
@@ -568,7 +566,7 @@ export class StatisticsService {
         ? "to_char(c.entry_date, 'YYYY-MM')"
         : "to_char(date_trunc('week', c.entry_date)::date, 'YYYY-MM-DD')";
 
-    const rows = await this.composturaRepository
+    const rows = await this.personalizationRepository
       .createQueryBuilder('c')
       .select(periodExpr, 'period')
       .addSelect('COUNT(c.id)', 'count')

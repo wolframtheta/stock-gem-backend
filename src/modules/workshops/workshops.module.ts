@@ -11,4 +11,3 @@ import { Workshop } from './entities/workshop.entity';
   exports: [WorkshopsService],
 })
 export class WorkshopsModule {}
-

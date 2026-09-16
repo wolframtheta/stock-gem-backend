@@ -34,4 +34,3 @@ export class Albaran extends BaseEntity {
   @OneToMany(() => AlbaranItem, (item) => item.albaran, { cascade: true })
   items: AlbaranItem[];
 }
-

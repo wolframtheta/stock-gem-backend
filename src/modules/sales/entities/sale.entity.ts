@@ -45,7 +45,12 @@ export class Sale extends BaseEntity {
   @Column({ name: 'sale_number', type: 'varchar', length: 50, unique: true })
   saleNumber: string;
 
-  @Column({ name: 'ticket_number', type: 'varchar', length: 50, nullable: true })
+  @Column({
+    name: 'ticket_number',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
   ticketNumber: string | null;
 
   @ManyToOne(() => Client, { nullable: true, onDelete: 'SET NULL' })
@@ -76,7 +81,13 @@ export class Sale extends BaseEntity {
   })
   paymentType: PaymentType;
 
-  @Column({ name: 'total_discount', type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({
+    name: 'total_discount',
+    type: 'decimal',
+    precision: 10,
+    scale: 2,
+    default: 0,
+  })
   totalDiscount: number;
 
   @Column({ name: 'total_amount', type: 'decimal', precision: 10, scale: 2 })
@@ -85,4 +96,3 @@ export class Sale extends BaseEntity {
   @OneToMany(() => SaleItem, (item) => item.sale, { cascade: true })
   items: SaleItem[];
 }
-

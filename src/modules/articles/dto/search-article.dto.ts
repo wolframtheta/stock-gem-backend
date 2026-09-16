@@ -7,10 +7,6 @@ export class SearchArticleDto {
 
   @IsString()
   @IsOptional()
-  supplierReference?: string;
-
-  @IsString()
-  @IsOptional()
   description?: string;
 
   @IsString()
@@ -26,4 +22,3 @@ export class SearchArticleDto {
   @IsOptional()
   q?: string;
 }
-

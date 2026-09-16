@@ -89,14 +89,14 @@ export class FairsController {
     );
   }
 
-  @Get(':id/statistics/composturas-time-series')
-  getComposturasTimeSeries(
+  @Get(':id/statistics/personalizations-time-series')
+  getPersonalizationsTimeSeries(
     @Param('id') id: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('granularity') granularity?: string,
   ) {
-    return this.statisticsService.getFairComposturasTimeSeries(
+    return this.statisticsService.getFairPersonalizationsTimeSeries(
       id,
       from,
       to,

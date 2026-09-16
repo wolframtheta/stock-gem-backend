@@ -16,28 +16,8 @@ export class CreateArticleDto {
   ownReference: string;
 
   @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  supplierReference?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  family?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  subfamily?: string;
-
-  @IsString()
   @IsNotEmpty()
   description: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(255)
-  shortDescription?: string;
 
   @IsNumber()
   @Type(() => Number)
@@ -55,23 +35,6 @@ export class CreateArticleDto {
   @IsOptional()
   stock?: number;
 
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @IsOptional()
-  weight?: number;
-
-  @IsNumber()
-  @Type(() => Number)
-  @IsOptional()
-  margin?: number;
-
-  @IsNumber()
-  @Type(() => Number)
-  @Min(0)
-  @IsOptional()
-  taxBase?: number;
-
   @IsString()
   @IsOptional()
   observations?: string;
@@ -81,15 +44,6 @@ export class CreateArticleDto {
   @MaxLength(500)
   photo?: string;
 
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  barcode?: string;
-
-  @IsUUID()
-  @IsOptional()
-  supplierId?: string;
-
   @IsUUID()
   @IsOptional()
   collectionId?: string;
@@ -98,4 +52,3 @@ export class CreateArticleDto {
   @IsOptional()
   articleTypeId?: string;
 }
-

@@ -11,4 +11,3 @@ export class CreateWorkshopDto {
   @MaxLength(20)
   phone?: string;
 }
-

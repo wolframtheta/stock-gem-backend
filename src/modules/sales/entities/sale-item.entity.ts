@@ -33,4 +33,3 @@ export class SaleItem extends BaseEntity {
   @Column({ name: 'total_price', type: 'decimal', precision: 10, scale: 2 })
   totalPrice: number;
 }
-

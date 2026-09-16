@@ -18,4 +18,3 @@ import jwtConfig from './jwt.config';
   ],
 })
 export class ConfigModule {}
-

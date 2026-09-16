@@ -16,4 +16,3 @@ import { Article } from '../articles/entities/article.entity';
   exports: [AlbaranesService],
 })
 export class AlbaranesModule {}
-

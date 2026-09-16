@@ -87,7 +87,9 @@ export class FairsService {
     await this.fairRepository.remove(fair);
   }
 
-  async getStock(fairId: string): Promise<(FairStock & { maxQuantity: number })[]> {
+  async getStock(
+    fairId: string,
+  ): Promise<(FairStock & { maxQuantity: number })[]> {
     await this.findOne(fairId);
     const items = await this.fairStockRepository.find({
       where: { fairId },
@@ -281,9 +283,7 @@ export class FairsService {
       throw new BadRequestException('La fira ja té stock assignat');
     }
 
-    const warehouseStock = await this.salesPointsService.getStock(
-      warehouse.id,
-    );
+    const warehouseStock = await this.salesPointsService.getStock(warehouse.id);
     let imported = 0;
     for (const item of warehouseStock) {
       if (item.quantity > 0 && item.articleId) {

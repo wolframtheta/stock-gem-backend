@@ -13,10 +13,7 @@ import { Article } from '../articles/entities/article.entity';
 import { FairStock } from '../fairs/entities/fair-stock.entity';
 import { CreateSalesPointDto } from './dto/create-sales-point.dto';
 import { UpdateSalesPointDto } from './dto/update-sales-point.dto';
-import {
-  AssignStockDto,
-  AssignStockBatchDto,
-} from './dto/assign-stock.dto';
+import { AssignStockDto, AssignStockBatchDto } from './dto/assign-stock.dto';
 import { FairsService } from '../fairs/fairs.service';
 
 @Injectable()
@@ -67,7 +64,10 @@ export class SalesPointsService {
     return salesPoint;
   }
 
-  async update(id: string, updateDto: UpdateSalesPointDto): Promise<SalesPoint> {
+  async update(
+    id: string,
+    updateDto: UpdateSalesPointDto,
+  ): Promise<SalesPoint> {
     const salesPoint = await this.findOne(id);
     if (updateDto.code && updateDto.code !== salesPoint.code) {
       const existing = await this.salesPointRepository.findOne({
@@ -153,9 +153,7 @@ export class SalesPointsService {
     return this.getUnassignedStock(articleId);
   }
 
-  async getAvailableForAddStock(
-    destinationId: string,
-  ): Promise<
+  async getAvailableForAddStock(destinationId: string): Promise<
     {
       articleId: string;
       ownReference: string;
@@ -208,15 +206,13 @@ export class SalesPointsService {
       this.getStock(warehouse.id),
       this.getStock(destinationId),
     ]);
-    const destMap = new Map(
-      destStock.map((s) => [s.articleId, s.quantity]),
-    );
+    const destMap = new Map(destStock.map((s) => [s.articleId, s.quantity]));
     return warehouseStock
       .filter((s) => s.quantity > 0 && s.article)
       .map((s) => ({
         articleId: s.articleId,
-        ownReference: s.article!.ownReference,
-        description: s.article!.description,
+        ownReference: s.article.ownReference,
+        description: s.article.description,
         quantityAvailable: s.quantity,
         quantityAtDestination: destMap.get(s.articleId) ?? 0,
       }))
@@ -481,8 +477,7 @@ export class SalesPointsService {
       fromType === 'fair'
         ? (id: string, artId: string) =>
             this.fairsService.getStockAtFair(id, artId)
-        : (id: string, artId: string) =>
-            this.getStockAtPoint(id, artId);
+        : (id: string, artId: string) => this.getStockAtPoint(id, artId);
 
     for (const item of items) {
       const stockAtFrom = await getStockAtFrom(fromId, item.articleId);

@@ -27,7 +27,7 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { email, password, name, role } = registerDto;
+    const { email, password, name } = registerDto;
 
     const existingUser = await this.userRepository.findOne({
       where: { email },
@@ -44,7 +44,7 @@ export class AuthService {
       email,
       password: hashedPassword,
       name,
-      role: role || UserRole.BOTIGA,
+      role: UserRole.BOTIGA,
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -180,4 +180,3 @@ export class AuthService {
     return value * (multipliers[unit] || 60);
   }
 }
-

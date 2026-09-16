@@ -13,7 +13,8 @@ import { Type } from 'class-transformer';
 import { PaymentType } from '../entities/sale.entity';
 import { CreateSaleItemDto } from './create-sale-item.dto';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class CreateSaleDto {
   // saleNumber se genera automáticamente, no se envía desde el frontend
@@ -55,4 +56,3 @@ export class CreateSaleDto {
   @Type(() => CreateSaleItemDto)
   items: CreateSaleItemDto[];
 }
-

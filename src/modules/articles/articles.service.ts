@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Article } from './entities/article.entity';
@@ -8,7 +12,6 @@ import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { SearchArticleDto } from './dto/search-article.dto';
 import { AddStockDto } from './dto/add-stock.dto';
-import { Supplier } from '../suppliers/entities/supplier.entity';
 import { SalesPointStock } from '../sales-points/entities/sales-point-stock.entity';
 import { FairStock } from '../fairs/entities/fair-stock.entity';
 import { Collection } from '../config/entities/collection.entity';
@@ -43,8 +46,6 @@ export class ArticlesService {
     private priceHistoryRepository: Repository<ArticlePriceHistory>,
     @InjectRepository(ArticleStockHistory)
     private stockHistoryRepository: Repository<ArticleStockHistory>,
-    @InjectRepository(Supplier)
-    private supplierRepository: Repository<Supplier>,
     @InjectRepository(SalesPointStock)
     private salesPointStockRepository: Repository<SalesPointStock>,
     @InjectRepository(FairStock)
@@ -66,20 +67,6 @@ export class ArticlesService {
       throw new ConflictException(
         'El artículo con esta referencia propia ya existe',
       );
-    }
-
-    // Verificar si el proveedor existe (si se proporciona)
-    let supplier: Supplier | null = null;
-    if (createArticleDto.supplierId) {
-      supplier = await this.supplierRepository.findOne({
-        where: { id: createArticleDto.supplierId },
-      });
-
-      if (!supplier) {
-        throw new NotFoundException(
-          `Supplier with ID ${createArticleDto.supplierId} not found`,
-        );
-      }
     }
 
     let collection: Collection | null = null;
@@ -109,7 +96,6 @@ export class ArticlesService {
     const article = this.articleRepository.create({
       ...createArticleDto,
       stock: createArticleDto.stock ?? 0,
-      supplier: supplier || null,
       collection: collection || null,
       articleType: articleType || null,
     });
@@ -151,7 +137,7 @@ export class ArticlesService {
       return this.findAllForFair(user.fairId);
     }
     return this.articleRepository.find({
-      relations: ['supplier', 'collection', 'articleType'],
+      relations: ['collection', 'articleType'],
       order: { ownReference: 'ASC' },
     });
   }
@@ -160,7 +146,6 @@ export class ArticlesService {
     const stockRows = await this.fairStockRepository
       .createQueryBuilder('fs')
       .innerJoinAndSelect('fs.article', 'a')
-      .leftJoinAndSelect('a.supplier', 'supplier')
       .leftJoinAndSelect('a.collection', 'collection')
       .leftJoinAndSelect('a.articleType', 'articleType')
       .where('fs.fair_id = :fairId', { fairId })
@@ -174,12 +159,13 @@ export class ArticlesService {
 
   async findOne(id: string, user?: User): Promise<ArticleWithFairQty> {
     if (user?.role === UserRole.BOTIGA) {
-      if (!user.fairId) throw new NotFoundException(`Article with ID ${id} not found`);
+      if (!user.fairId)
+        throw new NotFoundException(`Article with ID ${id} not found`);
       return this.findOneForFair(id, user.fairId);
     }
     const article = await this.articleRepository.findOne({
       where: { id },
-      relations: ['supplier', 'collection', 'articleType'],
+      relations: ['collection', 'articleType'],
     });
     if (!article) {
       throw new NotFoundException(`Article with ID ${id} not found`);
@@ -193,7 +179,7 @@ export class ArticlesService {
   ): Promise<ArticleWithFairQty> {
     const fairStock = await this.fairStockRepository.findOne({
       where: { fairId, articleId: id },
-      relations: ['article', 'article.supplier', 'article.collection', 'article.articleType'],
+      relations: ['article', 'article.collection', 'article.articleType'],
     });
     if (!fairStock) {
       throw new NotFoundException(`Article with ID ${id} not found`);
@@ -204,7 +190,10 @@ export class ArticlesService {
     };
   }
 
-  async update(id: string, updateArticleDto: UpdateArticleDto): Promise<Article> {
+  async update(
+    id: string,
+    updateArticleDto: UpdateArticleDto,
+  ): Promise<Article> {
     const article = await this.findOne(id);
 
     // Si se actualiza la referencia propia, verificar que no exista otra
@@ -221,22 +210,6 @@ export class ArticlesService {
           'El artículo con esta referencia propia ya existe',
         );
       }
-    }
-
-    // Si se actualiza el proveedor, verificar que existe
-    if (updateArticleDto.supplierId) {
-      const supplier = await this.supplierRepository.findOne({
-        where: { id: updateArticleDto.supplierId },
-      });
-
-      if (!supplier) {
-        throw new NotFoundException(
-          `Supplier with ID ${updateArticleDto.supplierId} not found`,
-        );
-      }
-
-      article.supplier = supplier;
-      article.supplierId = supplier.id;
     }
 
     if (updateArticleDto.collectionId !== undefined) {
@@ -261,7 +234,7 @@ export class ArticlesService {
         const t = await this.articleTypeRepository.findOne({
           where: { id: updateArticleDto.articleTypeId },
         });
-        if (!t) throw new NotFoundException('Tipus d\'article no trobat');
+        if (!t) throw new NotFoundException("Tipus d'article no trobat");
         article.articleType = t;
         article.articleTypeId = t.id;
       }
@@ -271,7 +244,6 @@ export class ArticlesService {
     const oldStock = article.stock;
     Object.assign(article, {
       ...updateArticleDto,
-      supplierId: undefined,
       collectionId: undefined,
       articleTypeId: undefined,
     });
@@ -299,10 +271,7 @@ export class ArticlesService {
         const newTotal = Number(saved.stock);
         const assignedElsewhere =
           (await this.getAssignedOutsideWarehouse(saved.id, warehouse.id)) ?? 0;
-        const newWarehouseQty = Math.max(
-          0,
-          newTotal - assignedElsewhere,
-        );
+        const newWarehouseQty = Math.max(0, newTotal - assignedElsewhere);
         await this.salesPointsService.assignStock(warehouse.id, {
           articleId: saved.id,
           quantity: newWarehouseQty,
@@ -350,7 +319,6 @@ export class ArticlesService {
     }
     const queryBuilder = this.articleRepository
       .createQueryBuilder('article')
-      .leftJoinAndSelect('article.supplier', 'supplier')
       .leftJoinAndSelect('article.collection', 'collection')
       .leftJoinAndSelect('article.articleType', 'articleType');
 
@@ -358,15 +326,6 @@ export class ArticlesService {
       queryBuilder.andWhere('article.ownReference ILIKE :ownReference', {
         ownReference: `%${searchDto.ownReference}%`,
       });
-    }
-
-    if (searchDto.supplierReference) {
-      queryBuilder.andWhere(
-        'article.supplierReference ILIKE :supplierReference',
-        {
-          supplierReference: `%${searchDto.supplierReference}%`,
-        },
-      );
     }
 
     if (searchDto.description) {
@@ -390,7 +349,7 @@ export class ArticlesService {
     if (searchDto.q && searchDto.q.trim()) {
       const q = `%${searchDto.q.trim()}%`;
       queryBuilder.andWhere(
-        '(article.ownReference ILIKE :q OR article.description ILIKE :q OR article.supplierReference ILIKE :q OR collection.name ILIKE :q OR articleType.name ILIKE :q)',
+        '(article.ownReference ILIKE :q OR article.description ILIKE :q OR collection.name ILIKE :q OR articleType.name ILIKE :q)',
         { q },
       );
     }
@@ -407,7 +366,6 @@ export class ArticlesService {
     const qb = this.fairStockRepository
       .createQueryBuilder('fs')
       .innerJoinAndSelect('fs.article', 'a')
-      .leftJoinAndSelect('a.supplier', 'supplier')
       .leftJoinAndSelect('a.collection', 'collection')
       .leftJoinAndSelect('a.articleType', 'articleType')
       .where('fs.fair_id = :fairId', { fairId });
@@ -415,11 +373,6 @@ export class ArticlesService {
     if (searchDto.ownReference) {
       qb.andWhere('a.own_reference ILIKE :ownReference', {
         ownReference: `%${searchDto.ownReference}%`,
-      });
-    }
-    if (searchDto.supplierReference) {
-      qb.andWhere('a.supplier_reference ILIKE :supplierReference', {
-        supplierReference: `%${searchDto.supplierReference}%`,
       });
     }
     if (searchDto.description) {
@@ -440,7 +393,7 @@ export class ArticlesService {
     if (searchDto.q && searchDto.q.trim()) {
       const q = `%${searchDto.q.trim()}%`;
       qb.andWhere(
-        '(a.own_reference ILIKE :q OR a.description ILIKE :q OR a.supplier_reference ILIKE :q OR collection.name ILIKE :q OR articleType.name ILIKE :q)',
+        '(a.own_reference ILIKE :q OR a.description ILIKE :q OR collection.name ILIKE :q OR articleType.name ILIKE :q)',
         { q },
       );
     }
@@ -474,7 +427,7 @@ export class ArticlesService {
     const article = await this.findOne(id, user);
 
     if (user && this.isBotigaWithFair(user)) {
-      const qty = (article as ArticleWithFairQty).quantityAtFair ?? 0;
+      const qty = article.quantityAtFair ?? 0;
       return {
         total: qty,
         bySalesPoint: [
@@ -501,8 +454,14 @@ export class ArticlesService {
       }),
     ]);
 
-    const assignedToPoints = stockByPoint.reduce((sum, sp) => sum + sp.quantity, 0);
-    const assignedToFairs = stockByFair.reduce((sum, fs) => sum + fs.quantity, 0);
+    const assignedToPoints = stockByPoint.reduce(
+      (sum, sp) => sum + sp.quantity,
+      0,
+    );
+    const assignedToFairs = stockByFair.reduce(
+      (sum, fs) => sum + fs.quantity,
+      0,
+    );
     const bySalesPoint = stockByPoint.map((sp) => ({
       salesPointId: sp.salesPointId,
       salesPointCode: sp.salesPoint?.code ?? '',
@@ -519,7 +478,10 @@ export class ArticlesService {
       total: article.stock,
       bySalesPoint,
       byFair,
-      unassigned: Math.max(0, article.stock - assignedToPoints - assignedToFairs),
+      unassigned: Math.max(
+        0,
+        article.stock - assignedToPoints - assignedToFairs,
+      ),
     };
   }
 
@@ -541,8 +503,10 @@ export class ArticlesService {
 
     const warehouse = await this.salesPointsService.getDefaultWarehouse();
     if (warehouse) {
-      const currentAtWarehouse =
-        await this.salesPointsService.getStockAtPoint(warehouse.id, id);
+      const currentAtWarehouse = await this.salesPointsService.getStockAtPoint(
+        warehouse.id,
+        id,
+      );
       await this.salesPointsService.assignStock(warehouse.id, {
         articleId: id,
         quantity: currentAtWarehouse + qty,
@@ -552,7 +516,10 @@ export class ArticlesService {
     return this.findOne(id);
   }
 
-  async getPriceHistory(id: string, user?: User): Promise<ArticlePriceHistory[]> {
+  async getPriceHistory(
+    id: string,
+    user?: User,
+  ): Promise<ArticlePriceHistory[]> {
     await this.findOne(id, user);
     return this.priceHistoryRepository.find({
       where: { articleId: id },
@@ -571,16 +538,12 @@ export class ArticlesService {
       .where('h.article_id = :id', { id });
 
     if (year) {
-      qb.andWhere(
-        'h.recorded_at >= :start AND h.recorded_at <= :end',
-        {
-          start: `${year}-01-01`,
-          end: `${year}-12-31`,
-        },
-      );
+      qb.andWhere('h.recorded_at >= :start AND h.recorded_at <= :end', {
+        start: `${year}-01-01`,
+        end: `${year}-12-31`,
+      });
     }
 
     return qb.orderBy('h.recorded_at', 'ASC').getMany();
   }
 }
-

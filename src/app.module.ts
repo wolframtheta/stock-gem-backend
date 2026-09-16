@@ -10,7 +10,7 @@ import { WorkshopsModule } from './modules/workshops/workshops.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
 import { ArticlesModule } from './modules/articles/articles.module';
 import { SalesModule } from './modules/sales/sales.module';
-import { ComposturasModule } from './modules/composturas/composturas.module';
+import { PersonalizationsModule } from './modules/personalizations/personalizations.module';
 import { AlbaranesModule } from './modules/albaranes/albaranes.module';
 import { SalesPointsModule } from './modules/sales-points/sales-points.module';
 import { UsersModule } from './modules/users/users.module';
@@ -38,7 +38,7 @@ import { StatisticsModule } from './modules/statistics/statistics.module';
     FairsModule,
     StatisticsModule,
     SalesModule,
-    ComposturasModule,
+    PersonalizationsModule,
     AlbaranesModule,
   ],
   controllers: [AppController],

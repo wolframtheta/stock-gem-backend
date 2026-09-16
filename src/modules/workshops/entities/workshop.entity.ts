@@ -11,4 +11,3 @@ export class Workshop extends BaseEntity {
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone: string | null;
 }
-

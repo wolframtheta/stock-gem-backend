@@ -72,10 +72,18 @@ export class ClientsService {
       });
     }
 
-    if (searchDto.landlinePhone) {
-      queryBuilder.andWhere('client.landlinePhone ILIKE :landlinePhone', {
-        landlinePhone: `%${searchDto.landlinePhone}%`,
+    if (searchDto.email) {
+      queryBuilder.andWhere('client.email ILIKE :email', {
+        email: `%${searchDto.email}%`,
       });
+    }
+
+    if (searchDto.q && searchDto.q.trim()) {
+      const q = `%${searchDto.q.trim()}%`;
+      queryBuilder.andWhere(
+        '(client.name ILIKE :q OR client.surname ILIKE :q OR client.email ILIKE :q OR client.mobilePhone ILIKE :q)',
+        { q },
+      );
     }
 
     queryBuilder.orderBy('client.surname', 'ASC');
@@ -84,4 +92,3 @@ export class ClientsService {
     return queryBuilder.getMany();
   }
 }
-

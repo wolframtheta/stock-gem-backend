@@ -25,4 +25,3 @@ export class SearchAlbaranDto {
   @IsOptional()
   condition?: string;
 }
-

@@ -44,7 +44,10 @@ export class WorkshopsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateWorkshopDto: UpdateWorkshopDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateWorkshopDto: UpdateWorkshopDto,
+  ) {
     return this.workshopsService.update(id, updateWorkshopDto);
   }
 
@@ -53,4 +56,3 @@ export class WorkshopsController {
     return this.workshopsService.remove(id);
   }
 }
-

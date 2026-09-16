@@ -19,4 +19,3 @@ import { SalesPointsModule } from '../sales-points/sales-points.module';
   exports: [SalesService],
 })
 export class SalesModule {}
-

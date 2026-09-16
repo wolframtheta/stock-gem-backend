@@ -12,4 +12,3 @@ export class AuthResponseDto {
     fairId: string | null;
   };
 }
-

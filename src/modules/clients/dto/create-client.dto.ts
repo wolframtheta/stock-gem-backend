@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, IsOptional, MaxLength } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  IsOptional,
+  IsEmail,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateClientDto {
   @IsString()
@@ -7,9 +13,14 @@ export class CreateClientDto {
   name: string;
 
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   @MaxLength(255)
-  surname: string;
+  surname?: string;
+
+  @IsEmail()
+  @IsOptional()
+  @MaxLength(255)
+  email?: string;
 
   @IsString()
   @IsOptional()
@@ -18,7 +29,5 @@ export class CreateClientDto {
 
   @IsString()
   @IsOptional()
-  @MaxLength(20)
-  landlinePhone?: string;
+  observations?: string;
 }
-

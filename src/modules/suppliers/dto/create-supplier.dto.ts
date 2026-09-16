@@ -34,4 +34,3 @@ export class CreateSupplierDto {
   @IsOptional()
   email?: string;
 }
-

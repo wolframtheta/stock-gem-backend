@@ -33,4 +33,3 @@ export class User extends BaseEntity {
   @Column({ name: 'fair_id', nullable: true })
   fairId: string | null;
 }
-

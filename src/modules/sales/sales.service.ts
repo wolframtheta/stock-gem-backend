@@ -34,7 +34,7 @@ export class SalesService {
   async create(createSaleDto: CreateSaleDto): Promise<Sale> {
     // Generar número de venta automáticamente
     const saleNumber = await this.generateSaleNumber();
-    
+
     // Generar número de ticket automáticamente
     const ticketNumber = await this.generateTicketNumber();
 
@@ -216,7 +216,9 @@ export class SalesService {
       });
     }
 
-    queryBuilder.orderBy('sale.saleDate', 'DESC').addOrderBy('sale.createdAt', 'DESC');
+    queryBuilder
+      .orderBy('sale.saleDate', 'DESC')
+      .addOrderBy('sale.createdAt', 'DESC');
 
     return queryBuilder.getMany();
   }
@@ -373,4 +375,3 @@ export class SalesService {
     return `T${year}${month}${day}${String(sequence).padStart(4, '0')}`;
   }
 }
-

@@ -11,10 +11,7 @@ export class StatisticsController {
   constructor(private readonly statisticsService: StatisticsService) {}
 
   @Get('sales-by-store')
-  getSalesByStore(
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
+  getSalesByStore(@Query('from') from?: string, @Query('to') to?: string) {
     return this.statisticsService.getSalesByStore(from, to);
   }
 
@@ -32,10 +29,7 @@ export class StatisticsController {
   }
 
   @Get('sales-by-article')
-  getSalesByArticle(
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
+  getSalesByArticle(@Query('from') from?: string, @Query('to') to?: string) {
     return this.statisticsService.getSalesByArticle(from, to);
   }
 
@@ -53,10 +47,7 @@ export class StatisticsController {
   }
 
   @Get('sales-by-fair')
-  getSalesByFair(
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
+  getSalesByFair(@Query('from') from?: string, @Query('to') to?: string) {
     return this.statisticsService.getSalesByFair(from, to);
   }
 
@@ -74,10 +65,7 @@ export class StatisticsController {
   }
 
   @Get('manufacturing')
-  getManufacturing(
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
+  getManufacturing(@Query('from') from?: string, @Query('to') to?: string) {
     return this.statisticsService.getManufacturing(from, to);
   }
 

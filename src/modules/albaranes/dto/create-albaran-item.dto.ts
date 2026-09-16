@@ -1,4 +1,11 @@
-import { IsUUID, IsInt, IsNumber, IsString, Min, IsOptional } from 'class-validator';
+import {
+  IsUUID,
+  IsInt,
+  IsNumber,
+  IsString,
+  Min,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateAlbaranItemDto {
   @IsUUID()
@@ -24,4 +31,3 @@ export class CreateAlbaranItemDto {
   @Min(0)
   pvp: number;
 }
-

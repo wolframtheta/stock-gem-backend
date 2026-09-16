@@ -11,10 +11,7 @@ import {
 import { SalesPointsService } from './sales-points.service';
 import { CreateSalesPointDto } from './dto/create-sales-point.dto';
 import { UpdateSalesPointDto } from './dto/update-sales-point.dto';
-import {
-  AssignStockDto,
-  AssignStockBatchDto,
-} from './dto/assign-stock.dto';
+import { AssignStockDto, AssignStockBatchDto } from './dto/assign-stock.dto';
 import { UpdateStockDto } from './dto/update-stock.dto';
 import { MoveStockDto } from './dto/move-stock.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';

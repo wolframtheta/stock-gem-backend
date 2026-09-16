@@ -1,21 +1,15 @@
-import {
-  Entity,
-  Column,
-  Index,
-  ManyToOne,
-  JoinColumn,
-} from 'typeorm';
+import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Client } from '../../clients/entities/client.entity';
 import { Workshop } from '../../workshops/entities/workshop.entity';
-import { ComposturaType } from '../../config/entities/compostura-type.entity';
+import { PersonalizationType } from '../../config/entities/personalization-type.entity';
 
-@Entity('composturas')
-@Index('idx_composturas_code', ['code'])
-@Index('idx_composturas_client_id', ['client'])
-@Index('idx_composturas_workshop_id', ['workshop'])
-@Index('idx_composturas_entry_date', ['entryDate'])
-export class Compostura extends BaseEntity {
+@Entity('personalizations')
+@Index('idx_personalizations_code', ['code'])
+@Index('idx_personalizations_client_id', ['client'])
+@Index('idx_personalizations_workshop_id', ['workshop'])
+@Index('idx_personalizations_entry_date', ['entryDate'])
+export class Personalization extends BaseEntity {
   @Column({ type: 'varchar', length: 50, unique: true })
   code: string;
 
@@ -27,12 +21,15 @@ export class Compostura extends BaseEntity {
   @JoinColumn({ name: 'workshop_id' })
   workshop: Workshop | null;
 
-  @ManyToOne(() => ComposturaType, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'compostura_type_id' })
-  composturaType: ComposturaType | null;
+  @ManyToOne(() => PersonalizationType, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'personalization_type_id' })
+  personalizationType: PersonalizationType | null;
 
-  @Column({ name: 'compostura_type_id', nullable: true })
-  composturaTypeId: string | null;
+  @Column({ name: 'personalization_type_id', nullable: true })
+  personalizationTypeId: string | null;
 
   @Column({ type: 'text' })
   description: string;
@@ -82,4 +79,3 @@ export class Compostura extends BaseEntity {
   @Column({ type: 'varchar', length: 500, nullable: true })
   photo: string | null;
 }
-

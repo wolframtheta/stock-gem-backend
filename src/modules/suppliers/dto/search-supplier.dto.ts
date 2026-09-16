@@ -9,4 +9,3 @@ export class SearchSupplierDto {
   @IsOptional()
   phone?: string;
 }
-

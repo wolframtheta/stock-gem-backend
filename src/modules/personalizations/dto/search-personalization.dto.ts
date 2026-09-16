@@ -1,6 +1,6 @@
 import { IsOptional, IsString, IsDateString, IsUUID } from 'class-validator';
 
-export class SearchComposturaDto {
+export class SearchPersonalizationDto {
   @IsString()
   @IsOptional()
   code?: string;
@@ -37,4 +37,3 @@ export class SearchComposturaDto {
   @IsOptional()
   deliveryToClientDateTo?: string;
 }
-
