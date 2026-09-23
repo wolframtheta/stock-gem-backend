@@ -14,7 +14,7 @@ import {
   ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ArticleSizeInputDto } from './article-size-input.dto';
+import { ArticleVariantInputDto } from './article-variant-input.dto';
 
 export class CreateArticleDto {
   @IsString()
@@ -70,13 +70,13 @@ export class CreateArticleDto {
 
   @IsOptional()
   @IsBoolean()
-  hasSizes?: boolean;
+  hasVariants?: boolean;
 
-  @ValidateIf((o) => o.hasSizes === true)
+  @ValidateIf((o) => o.hasVariants === true)
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => ArticleSizeInputDto)
+  @Type(() => ArticleVariantInputDto)
   @ArrayMinSize(1)
   @ArrayMaxSize(50)
-  sizes?: ArticleSizeInputDto[];
+  variants?: ArticleVariantInputDto[];
 }

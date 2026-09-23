@@ -10,7 +10,7 @@ import { BaseEntity } from '../../../common/entities/base.entity';
 import { Collection } from '../../config/entities/collection.entity';
 import { ArticleType } from '../../config/entities/article-type.entity';
 import { ArticlePhoto } from './article-photo.entity';
-import { ArticleSize } from './article-size.entity';
+import { ArticleVariant } from './article-variant.entity';
 
 @Entity('articles')
 @Index('idx_articles_own_reference', ['ownReference'])
@@ -30,8 +30,8 @@ export class Article extends BaseEntity {
   @Column({ type: 'int', default: 0 })
   stock: number;
 
-  @Column({ name: 'has_sizes', type: 'boolean', default: false })
-  hasSizes: boolean;
+  @Column({ name: 'has_variants', type: 'boolean', default: false })
+  hasVariants: boolean;
 
   @Column({ type: 'text', nullable: true })
   observations: string | null;
@@ -56,6 +56,6 @@ export class Article extends BaseEntity {
   @OneToMany(() => ArticlePhoto, (photo) => photo.article)
   photos: ArticlePhoto[];
 
-  @OneToMany(() => ArticleSize, (size) => size.article)
-  sizes: ArticleSize[];
+  @OneToMany(() => ArticleVariant, (variant) => variant.article)
+  variants: ArticleVariant[];
 }

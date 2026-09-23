@@ -5,48 +5,63 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { Article } from './entities/article.entity';
 import { ArticlePhoto } from './entities/article-photo.entity';
-import { ArticleSize } from './entities/article-size.entity';
-import { ArticleSizeStock } from './entities/article-size-stock.entity';
+import { ArticleVariant } from './entities/article-variant.entity';
+import { ArticleVariantStock } from './entities/article-variant-stock.entity';
 import { ArticlePriceHistory } from './entities/article-price-history.entity';
 import { ArticleStockHistory } from './entities/article-stock-history.entity';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { SearchArticleDto } from './dto/search-article.dto';
 import { AddStockDto } from './dto/add-stock.dto';
-import { ArticleSizeInputDto } from './dto/article-size-input.dto';
+import { ArticleVariantInputDto } from './dto/article-variant-input.dto';
 import { shouldRecordPriceHistory } from './articles-pricing.util';
 import {
-  assertCanDeleteSize,
-  assertHasSizesBlocked,
+  assertCanDeleteVariant,
+  assertHasVariantsBlocked,
   assertStockWritable,
-  DEFAULT_MIGRATION_SIZE_LABEL,
-  normalizeSizeLabel,
+  DEFAULT_MIGRATION_VARIANT_LABEL,
+  normalizeVariantLabel,
   sumWarehouseQuantities,
-  validateUniqueSizeLabels,
-} from './articles-sizes.util';
+  validateAddStockVariants,
+  validateUniqueVariantLabels,
+} from './articles-variants.util';
 import { SalesPointStock } from '../sales-points/entities/sales-point-stock.entity';
-import { SalesPointSizeStock } from '../sales-points/entities/sales-point-size-stock.entity';
+import { SalesPointVariantStock } from '../sales-points/entities/sales-point-variant-stock.entity';
 import { FairStock } from '../fairs/entities/fair-stock.entity';
-import { FairSizeStock } from '../fairs/entities/fair-size-stock.entity';
+import { FairVariantStock } from '../fairs/entities/fair-variant-stock.entity';
 import { Collection } from '../config/entities/collection.entity';
 import { ArticleType } from '../config/entities/article-type.entity';
 import { SalesPointsService } from '../sales-points/sales-points.service';
 import { User, UserRole } from '../auth/entities/user.entity';
 
-export type ArticleSizeResponse = {
+export type ArticleVariantResponse = {
   id: string;
   label: string;
   sortOrder: number;
   warehouseQuantity: number;
 };
 
-export type ArticleWithFairQty = Omit<Article, 'sizes'> & {
+export type ArticleWithFairQty = Omit<Article, 'variants'> & {
   quantityAtFair?: number;
-  sizes?: ArticleSizeResponse[];
+  variants?: ArticleVariantResponse[];
 };
+
+export interface StockBreakdownSalesPointColumn {
+  salesPointId: string;
+  salesPointCode: string;
+  salesPointName: string;
+}
+
+export interface StockBreakdownVariantRow {
+  articleVariantId: string;
+  label: string;
+  sortOrder: number;
+  quantitiesBySalesPointId: Record<string, number>;
+  total: number;
+}
 
 export interface StockBreakdown {
   total: number;
@@ -62,6 +77,11 @@ export interface StockBreakdown {
     quantity: number;
   }[];
   unassigned: number;
+  /** Matriu talla × punt de venda (només articles amb hasVariants). */
+  variantMatrix?: {
+    columns: StockBreakdownSalesPointColumn[];
+    rows: StockBreakdownVariantRow[];
+  };
 }
 
 @Injectable()
@@ -71,16 +91,18 @@ export class ArticlesService {
     private articleRepository: Repository<Article>,
     @InjectRepository(ArticlePhoto)
     private articlePhotoRepository: Repository<ArticlePhoto>,
-    @InjectRepository(ArticleSize)
-    private articleSizeRepository: Repository<ArticleSize>,
-    @InjectRepository(ArticleSizeStock)
-    private articleSizeStockRepository: Repository<ArticleSizeStock>,
+    @InjectRepository(ArticleVariant)
+    private articleVariantRepository: Repository<ArticleVariant>,
+    @InjectRepository(ArticleVariantStock)
+    private articleVariantStockRepository: Repository<ArticleVariantStock>,
     @InjectRepository(ArticlePriceHistory)
     private priceHistoryRepository: Repository<ArticlePriceHistory>,
     @InjectRepository(ArticleStockHistory)
     private stockHistoryRepository: Repository<ArticleStockHistory>,
     @InjectRepository(SalesPointStock)
     private salesPointStockRepository: Repository<SalesPointStock>,
+    @InjectRepository(SalesPointVariantStock)
+    private salesPointVariantStockRepository: Repository<SalesPointVariantStock>,
     @InjectRepository(FairStock)
     private fairStockRepository: Repository<FairStock>,
     @InjectRepository(Collection)
@@ -91,12 +113,12 @@ export class ArticlesService {
   ) {}
 
   async create(createArticleDto: CreateArticleDto): Promise<ArticleWithFairQty> {
-    const hasSizes = createArticleDto.hasSizes ?? false;
-    assertStockWritable(hasSizes, createArticleDto.stock);
+    const hasVariants = createArticleDto.hasVariants ?? false;
+    assertStockWritable(hasVariants, createArticleDto.stock);
 
-    if (hasSizes && !createArticleDto.sizes?.length) {
+    if (hasVariants && !createArticleDto.variants?.length) {
       throw new BadRequestException(
-        'Article amb talles requereix almenys una talla',
+        'Article amb variants requereix almenys una talla',
       );
     }
 
@@ -134,15 +156,15 @@ export class ArticlesService {
       }
     }
 
-    const { photoPaths, photo, sizes, hasSizes: _hs, ...articleData } =
+    const { photoPaths, photo, variants, hasVariants: _hv, ...articleData } =
       createArticleDto;
     const primaryPhoto = photoPaths?.[0] ?? photo ?? null;
 
     const article = this.articleRepository.create({
       ...articleData,
       cost: createArticleDto.cost ?? null,
-      stock: hasSizes ? 0 : (createArticleDto.stock ?? 0),
-      hasSizes,
+      stock: hasVariants ? 0 : (createArticleDto.stock ?? 0),
+      hasVariants,
       photo: primaryPhoto,
       collection: collection || null,
       articleType: articleType || null,
@@ -166,8 +188,8 @@ export class ArticlesService {
       );
     }
 
-    if (hasSizes) {
-      await this.syncArticleSizes(saved.id, sizes!);
+    if (hasVariants) {
+      await this.syncArticleVariants(saved.id, variants!);
     } else if (saved.stock > 0) {
       const warehouse = await this.salesPointsService.getDefaultWarehouse();
       if (warehouse) {
@@ -223,7 +245,7 @@ export class ArticlesService {
     }
     const article = await this.articleRepository.findOne({
       where: { id },
-      relations: ['collection', 'articleType', 'photos', 'sizes', 'sizes.sizeStock'],
+      relations: ['collection', 'articleType', 'photos', 'variants', 'variants.variantStock'],
     });
     if (!article) {
       throw new NotFoundException(`Article with ID ${id} not found`);
@@ -248,8 +270,8 @@ export class ArticlesService {
         'collection',
         'articleType',
         'photos',
-        'sizes',
-        'sizes.sizeStock',
+        'variants',
+        'variants.variantStock',
       ],
     });
     const enriched = this.enrichArticleResponse(
@@ -268,18 +290,18 @@ export class ArticlesService {
 
   private enrichArticleResponse(article: Article): ArticleWithFairQty {
     const result = { ...article } as unknown as ArticleWithFairQty;
-    if (!article.hasSizes) {
-      result.sizes = [];
+    if (!article.hasVariants) {
+      result.variants = [];
       return result;
     }
-    result.sizes = (article.sizes ?? [])
+    result.variants = (article.variants ?? [])
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((s) => ({
         id: s.id,
         label: s.label,
         sortOrder: s.sortOrder,
-        warehouseQuantity: s.sizeStock?.quantity ?? 0,
+        warehouseQuantity: s.variantStock?.quantity ?? 0,
       }));
     return result;
   }
@@ -302,24 +324,24 @@ export class ArticlesService {
     await this.articlePhotoRepository.save(rows);
   }
 
-  private async getTotalQtyForSize(
-    articleSizeId: string,
+  private async getTotalQtyForVariant(
+    articleVariantId: string,
     em: EntityManager,
   ): Promise<number> {
-    const stockRepo = em.getRepository(ArticleSizeStock);
-    const spSizeRepo = em.getRepository(SalesPointSizeStock);
-    const fairSizeRepo = em.getRepository(FairSizeStock);
+    const stockRepo = em.getRepository(ArticleVariantStock);
+    const spVariantRepo = em.getRepository(SalesPointVariantStock);
+    const fairVariantRepo = em.getRepository(FairVariantStock);
 
-    const warehouse = await stockRepo.findOne({ where: { articleSizeId } });
-    const spResult = await spSizeRepo
+    const warehouse = await stockRepo.findOne({ where: { articleVariantId } });
+    const spResult = await spVariantRepo
       .createQueryBuilder('s')
       .select('COALESCE(SUM(s.quantity), 0)', 'total')
-      .where('s.article_size_id = :articleSizeId', { articleSizeId })
+      .where('s.article_variant_id = :articleVariantId', { articleVariantId })
       .getRawOne();
-    const fairResult = await fairSizeRepo
+    const fairResult = await fairVariantRepo
       .createQueryBuilder('f')
       .select('COALESCE(SUM(f.quantity), 0)', 'total')
-      .where('f.article_size_id = :articleSizeId', { articleSizeId })
+      .where('f.article_variant_id = :articleVariantId', { articleVariantId })
       .getRawOne();
 
     return (
@@ -329,16 +351,16 @@ export class ArticlesService {
     );
   }
 
-  private async assertCanActivateHasSizes(articleId: string): Promise<void> {
+  private async assertCanActivateHasVariants(articleId: string): Promise<void> {
     const breakdown = await this.getStockBreakdown(articleId);
     if (breakdown.unassigned > 0) {
       throw new ConflictException(
-        'No es pot activar talles: hi ha stock no assignat. Assigna tot al magatzem abans.',
+        'No es pot activar variants: hi ha stock no assignat. Assigna tot al magatzem abans.',
       );
     }
     if (breakdown.byFair.some((f) => f.quantity > 0)) {
       throw new ConflictException(
-        'No es pot activar talles amb stock assignat a fires',
+        'No es pot activar variants amb stock assignat a fires',
       );
     }
     const warehouse = await this.salesPointsService.getDefaultWarehouse();
@@ -348,7 +370,7 @@ export class ArticlesService {
         .reduce((sum, sp) => sum + sp.quantity, 0);
       if (outside > 0) {
         throw new ConflictException(
-          'No es pot activar talles amb stock assignat a punts de venda',
+          'No es pot activar variants amb stock assignat a punts de venda',
         );
       }
       const warehouseQty =
@@ -357,32 +379,74 @@ export class ArticlesService {
         )?.quantity ?? 0;
       if (warehouseQty < breakdown.total) {
         throw new ConflictException(
-          "No es pot activar talles: tot el stock ha d'estar al magatzem",
+          "No es pot activar variants: tot el stock ha d'estar al magatzem",
         );
       }
     }
   }
 
-  private async assertCanDeactivateHasSizes(articleId: string): Promise<void> {
-    const sizes = await this.articleSizeRepository.find({
+  private async assertCanDeactivateHasVariants(articleId: string): Promise<void> {
+    const sizes = await this.articleVariantRepository.find({
       where: { articleId },
     });
     for (const size of sizes) {
-      const total = await this.getTotalQtyForSize(
+      const total = await this.getTotalQtyForVariant(
         size.id,
         this.articleRepository.manager,
       );
       if (total > 0) {
         throw new ConflictException(
-          'No es pot desactivar talles mentre hi hagi stock per talla',
+          'No es pot desactivar variants mentre hi hagi stock per variant',
         );
       }
     }
   }
 
-  private async syncArticleSizes(
+  /**
+   * RN-51: per articles amb variants, el magatzem SP ha de coincidir amb la suma de
+   * article_variant_stock. Sincronització directa (no assignStock: evita validació
+   * d'unassigned fora de la transacció i lectura stale de article.stock).
+   */
+  private async syncWarehouseStockForVariants(
+    em: EntityManager,
     articleId: string,
-    sizesInput: ArticleSizeInputDto[],
+    total: number,
+  ): Promise<void> {
+    const warehouse = await this.salesPointsService.getDefaultWarehouse();
+    if (!warehouse) {
+      return;
+    }
+
+    const spStockRepo = em.getRepository(SalesPointStock);
+    const existing = await spStockRepo.findOne({
+      where: { salesPointId: warehouse.id, articleId },
+    });
+
+    if (total === 0) {
+      if (existing) {
+        await spStockRepo.remove(existing);
+      }
+      return;
+    }
+
+    if (existing) {
+      existing.quantity = total;
+      await spStockRepo.save(existing);
+      return;
+    }
+
+    await spStockRepo.save(
+      spStockRepo.create({
+        salesPointId: warehouse.id,
+        articleId,
+        quantity: total,
+      }),
+    );
+  }
+
+  private async syncArticleVariants(
+    articleId: string,
+    variantsInput: ArticleVariantInputDto[],
   ): Promise<number> {
     return this.articleRepository.manager.transaction(async (em) => {
       await em.findOne(Article, {
@@ -390,73 +454,73 @@ export class ArticlesService {
         lock: { mode: 'pessimistic_write' },
       });
 
-      const sizeRepo = em.getRepository(ArticleSize);
-      const stockRepo = em.getRepository(ArticleSizeStock);
-      const spSizeRepo = em.getRepository(SalesPointSizeStock);
-      const fairSizeRepo = em.getRepository(FairSizeStock);
+      const variantRepo = em.getRepository(ArticleVariant);
+      const stockRepo = em.getRepository(ArticleVariantStock);
+      const spVariantRepo = em.getRepository(SalesPointVariantStock);
+      const fairVariantRepo = em.getRepository(FairVariantStock);
 
-      const normalized = sizesInput.map((s, index) => ({
+      const normalized = variantsInput.map((s, index) => ({
         id: s.id,
-        label: normalizeSizeLabel(s.label),
+        label: normalizeVariantLabel(s.label),
         warehouseQuantity: Math.max(0, Number(s.warehouseQuantity ?? 0)),
         sortOrder: s.sortOrder ?? index,
       }));
 
-      validateUniqueSizeLabels(normalized.map((s) => s.label));
+      validateUniqueVariantLabels(normalized.map((s) => s.label));
 
-      const existing = await sizeRepo.find({
+      const existing = await variantRepo.find({
         where: { articleId },
-        relations: ['sizeStock'],
+        relations: ['variantStock'],
       });
       const existingById = new Map(existing.map((s) => [s.id, s]));
 
       for (const input of normalized) {
         if (input.id && !existingById.has(input.id)) {
-          throw new BadRequestException("Talla no pertany a l'article");
+          throw new BadRequestException("Variant no pertany a l'article");
         }
       }
 
       const keptIds = new Set<string>();
 
       for (const input of normalized) {
-        let size: ArticleSize;
+        let size: ArticleVariant;
         if (input.id) {
           size = existingById.get(input.id)!;
           size.label = input.label;
           size.sortOrder = input.sortOrder;
-          size = await sizeRepo.save(size);
+          size = await variantRepo.save(size);
         } else {
-          size = sizeRepo.create({
+          size = variantRepo.create({
             articleId,
             label: input.label,
             sortOrder: input.sortOrder,
           });
-          size = await sizeRepo.save(size);
+          size = await variantRepo.save(size);
         }
         keptIds.add(size.id);
 
-        let sizeStock = await stockRepo.findOne({
-          where: { articleSizeId: size.id },
+        let variantStock = await stockRepo.findOne({
+          where: { articleVariantId: size.id },
         });
-        if (!sizeStock) {
-          sizeStock = stockRepo.create({
-            articleSizeId: size.id,
+        if (!variantStock) {
+          variantStock = stockRepo.create({
+            articleVariantId: size.id,
             quantity: input.warehouseQuantity,
           });
         } else {
-          sizeStock.quantity = input.warehouseQuantity;
+          variantStock.quantity = input.warehouseQuantity;
         }
-        await stockRepo.save(sizeStock);
+        await stockRepo.save(variantStock);
       }
 
       for (const old of existing) {
         if (keptIds.has(old.id)) continue;
-        const totalQty = await this.getTotalQtyForSize(old.id, em);
-        assertCanDeleteSize(totalQty);
-        await stockRepo.delete({ articleSizeId: old.id });
-        await spSizeRepo.delete({ articleSizeId: old.id });
-        await fairSizeRepo.delete({ articleSizeId: old.id });
-        await sizeRepo.delete({ id: old.id });
+        const totalQty = await this.getTotalQtyForVariant(old.id, em);
+        assertCanDeleteVariant(totalQty);
+        await stockRepo.delete({ articleVariantId: old.id });
+        await spVariantRepo.delete({ articleVariantId: old.id });
+        await fairVariantRepo.delete({ articleVariantId: old.id });
+        await variantRepo.delete({ id: old.id });
       }
 
       const total = sumWarehouseQuantities(
@@ -466,16 +530,10 @@ export class ArticlesService {
       await em.update(
         Article,
         { id: articleId },
-        { stock: total, hasSizes: true },
+        { stock: total, hasVariants: true },
       );
 
-      const warehouse = await this.salesPointsService.getDefaultWarehouse();
-      if (warehouse) {
-        await this.salesPointsService.assignStock(warehouse.id, {
-          articleId,
-          quantity: total,
-        });
-      }
+      await this.syncWarehouseStockForVariants(em, articleId, total);
 
       return total;
     });
@@ -493,21 +551,21 @@ export class ArticlesService {
       throw new NotFoundException(`Article with ID ${id} not found`);
     }
 
-    const newHasSizes =
-      updateArticleDto.hasSizes !== undefined
-        ? updateArticleDto.hasSizes
-        : article.hasSizes;
+    const newHasVariants =
+      updateArticleDto.hasVariants !== undefined
+        ? updateArticleDto.hasVariants
+        : article.hasVariants;
 
-    assertStockWritable(newHasSizes, updateArticleDto.stock);
+    assertStockWritable(newHasVariants, updateArticleDto.stock);
 
-    const turningOn = !article.hasSizes && newHasSizes === true;
-    const turningOff = article.hasSizes && newHasSizes === false;
+    const turningOn = !article.hasVariants && newHasVariants === true;
+    const turningOff = article.hasVariants && newHasVariants === false;
 
     if (turningOn) {
-      await this.assertCanActivateHasSizes(id);
+      await this.assertCanActivateHasVariants(id);
     }
     if (turningOff) {
-      await this.assertCanDeactivateHasSizes(id);
+      await this.assertCanDeactivateHasVariants(id);
     }
 
     if (
@@ -554,7 +612,7 @@ export class ArticlesService {
     }
 
     const oldPvp = article.pvp;
-    const { photoPaths, photo, sizes, hasSizes, stock, ...updateData } =
+    const { photoPaths, photo, variants, hasVariants, stock, ...updateData } =
       updateArticleDto;
 
     if (photoPaths !== undefined) {
@@ -576,27 +634,27 @@ export class ArticlesService {
     });
 
     if (turningOff) {
-      article.hasSizes = false;
-      await this.articleSizeRepository.delete({ articleId: id });
+      article.hasVariants = false;
+      await this.articleVariantRepository.delete({ articleId: id });
     } else if (turningOn) {
-      article.hasSizes = true;
-      let sizesInput = sizes;
-      if (!sizesInput?.length && article.stock > 0) {
-        sizesInput = [
+      article.hasVariants = true;
+      let variantsInput = variants;
+      if (!variantsInput?.length && article.stock > 0) {
+        variantsInput = [
           {
-            label: DEFAULT_MIGRATION_SIZE_LABEL,
+            label: DEFAULT_MIGRATION_VARIANT_LABEL,
             warehouseQuantity: article.stock,
           },
         ];
-      } else if (!sizesInput?.length) {
+      } else if (!variantsInput?.length) {
         throw new BadRequestException(
-          'Article amb talles requereix almenys una talla',
+          'Article amb variants requereix almenys una talla',
         );
       }
-      article.stock = await this.syncArticleSizes(id, sizesInput);
-    } else if (article.hasSizes && sizes !== undefined) {
-      article.stock = await this.syncArticleSizes(id, sizes);
-    } else if (!article.hasSizes && stock !== undefined) {
+      article.stock = await this.syncArticleVariants(id, variantsInput);
+    } else if (article.hasVariants && variants !== undefined) {
+      article.stock = await this.syncArticleVariants(id, variants);
+    } else if (!article.hasVariants && stock !== undefined) {
       article.stock = Number(stock);
       const warehouse = await this.salesPointsService.getDefaultWarehouse();
       if (warehouse) {
@@ -762,7 +820,7 @@ export class ArticlesService {
     if (!article) {
       throw new NotFoundException(`Article with ID ${id} not found`);
     }
-    assertHasSizesBlocked(article.hasSizes);
+    assertHasVariantsBlocked(article.hasVariants);
 
     article.stock = article.stock + quantity;
 
@@ -778,6 +836,108 @@ export class ArticlesService {
     await this.findOne(id);
     const available = await this.salesPointsService.getAvailableStock(id);
     return { available };
+  }
+
+  private async buildVariantStockMatrix(
+    articleId: string,
+    stockByPoint: SalesPointStock[],
+  ): Promise<StockBreakdown['variantMatrix'] | undefined> {
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+      select: ['id', 'hasVariants'],
+    });
+    if (!article?.hasVariants) {
+      return undefined;
+    }
+
+    const sizes = await this.articleVariantRepository.find({
+      where: { articleId },
+      relations: ['variantStock'],
+      order: { sortOrder: 'ASC', label: 'ASC' },
+    });
+    if (sizes.length === 0) {
+      return undefined;
+    }
+
+    const warehouse = await this.salesPointsService.getDefaultWarehouse();
+    const variantIds = sizes.map((s) => s.id);
+    const spVariantRows = await this.salesPointVariantStockRepository.find({
+      where: { articleVariantId: In(variantIds) },
+      relations: ['salesPoint'],
+    });
+
+    const columnMap = new Map<string, StockBreakdownSalesPointColumn>();
+
+    if (warehouse) {
+      columnMap.set(warehouse.id, {
+        salesPointId: warehouse.id,
+        salesPointCode: warehouse.code,
+        salesPointName: warehouse.name,
+      });
+    }
+
+    for (const sp of stockByPoint) {
+      if (warehouse && sp.salesPointId === warehouse.id) {
+        continue;
+      }
+      if (sp.quantity <= 0) {
+        continue;
+      }
+      columnMap.set(sp.salesPointId, {
+        salesPointId: sp.salesPointId,
+        salesPointCode: sp.salesPoint?.code ?? '',
+        salesPointName: sp.salesPoint?.name ?? sp.salesPoint?.code ?? '-',
+      });
+    }
+
+    for (const row of spVariantRows) {
+      if (row.quantity <= 0) {
+        continue;
+      }
+      columnMap.set(row.salesPointId, {
+        salesPointId: row.salesPointId,
+        salesPointCode: row.salesPoint?.code ?? '',
+        salesPointName: row.salesPoint?.name ?? row.salesPoint?.code ?? '-',
+      });
+    }
+
+    const columns = Array.from(columnMap.values()).sort((a, b) => {
+      if (warehouse) {
+        if (a.salesPointId === warehouse.id) return -1;
+        if (b.salesPointId === warehouse.id) return 1;
+      }
+      return a.salesPointName.localeCompare(b.salesPointName, 'ca');
+    });
+
+    const spQtyByVariant = new Map<string, Map<string, number>>();
+    for (const row of spVariantRows) {
+      if (!spQtyByVariant.has(row.articleVariantId)) {
+        spQtyByVariant.set(row.articleVariantId, new Map());
+      }
+      spQtyByVariant.get(row.articleVariantId)!.set(row.salesPointId, row.quantity);
+    }
+
+    const matrixRows: StockBreakdownVariantRow[] = sizes.map((size) => {
+      const quantitiesBySalesPointId: Record<string, number> = {};
+      let total = 0;
+      for (const col of columns) {
+        const qty =
+          warehouse && col.salesPointId === warehouse.id
+            ? (size.variantStock?.quantity ?? 0)
+            : (spQtyByVariant.get(size.id)?.get(col.salesPointId) ?? 0);
+        quantitiesBySalesPointId[col.salesPointId] = qty;
+        total += qty;
+      }
+      return {
+        articleVariantId: size.id,
+        label: size.label,
+        sortOrder: size.sortOrder,
+        quantitiesBySalesPointId,
+        total,
+      };
+    });
+
+    return { columns, rows: matrixRows };
   }
 
   async getStockBreakdown(id: string, user?: User): Promise<StockBreakdown> {
@@ -831,6 +991,8 @@ export class ArticlesService {
       quantity: fs.quantity,
     }));
 
+    const variantMatrix = await this.buildVariantStockMatrix(id, stockByPoint);
+
     return {
       total: article.stock,
       bySalesPoint,
@@ -839,15 +1001,26 @@ export class ArticlesService {
         0,
         article.stock - assignedToPoints - assignedToFairs,
       ),
+      variantMatrix,
     };
   }
 
   async addStock(id: string, dto: AddStockDto): Promise<ArticleWithFairQty> {
-    const article = await this.articleRepository.findOne({ where: { id } });
+    const article = await this.articleRepository.findOne({
+      where: { id },
+      relations: ['variants', 'variants.variantStock'],
+    });
     if (!article) {
       throw new NotFoundException(`Article with ID ${id} not found`);
     }
-    assertHasSizesBlocked(article.hasSizes);
+
+    if (article.hasVariants) {
+      return this.addStockForVariants(article, dto);
+    }
+
+    if (dto.quantity == null || dto.quantity < 1) {
+      throw new BadRequestException('La quantitat ha de ser almenys 1');
+    }
 
     const qty = dto.quantity;
     const recordedAt = new Date(dto.date);
@@ -889,6 +1062,75 @@ export class ArticlesService {
     }
 
     return this.findOne(id);
+  }
+
+  private async addStockForVariants(
+    article: Article,
+    dto: AddStockDto,
+  ): Promise<ArticleWithFairQty> {
+    if (!dto.variants?.length) {
+      throw new BadRequestException('Indica les quantitats per variant');
+    }
+
+    const variantIds = new Set((article.variants ?? []).map((s) => s.id));
+    const totalAdded = validateAddStockVariants(dto.variants, variantIds);
+    const recordedAt = new Date(dto.date);
+    const oldPvp = Number(article.pvp);
+    const addByVariantId = new Map(
+      dto.variants.map((s) => [s.articleVariantId, s.quantity]),
+    );
+
+    await this.articleRepository.manager.transaction(async (em) => {
+      const stockRepo = em.getRepository(ArticleVariantStock);
+      const sizes = await em.find(ArticleVariant, {
+        where: { articleId: article.id },
+        relations: ['variantStock'],
+      });
+
+      let newTotal = 0;
+      for (const size of sizes) {
+        const delta = addByVariantId.get(size.id) ?? 0;
+        let variantStock = size.variantStock;
+        if (!variantStock) {
+          variantStock = stockRepo.create({
+            articleVariantId: size.id,
+            quantity: delta,
+          });
+        } else {
+          variantStock.quantity += delta;
+        }
+        await stockRepo.save(variantStock);
+        newTotal += variantStock.quantity;
+      }
+
+      await em.update(
+        Article,
+        { id: article.id },
+        { stock: newTotal, cost: dto.cost, pvp: dto.pvp },
+      );
+
+      await em.save(
+        em.create(ArticleStockHistory, {
+          articleId: article.id,
+          quantityAdded: totalAdded,
+          recordedAt,
+        }),
+      );
+
+      await this.syncWarehouseStockForVariants(em, article.id, newTotal);
+    });
+
+    if (shouldRecordPriceHistory(oldPvp, dto.pvp)) {
+      await this.priceHistoryRepository.save(
+        this.priceHistoryRepository.create({
+          articleId: article.id,
+          price: dto.pvp,
+          changedAt: recordedAt,
+        }),
+      );
+    }
+
+    return this.findOne(article.id);
   }
 
   async getPriceHistory(

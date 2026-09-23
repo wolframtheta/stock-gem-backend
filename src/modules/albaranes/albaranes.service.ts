@@ -60,9 +60,9 @@ export class AlbaranesService {
           `Artículo con ID ${itemDto.articleId} no encontrado`,
         );
       }
-      if (article.hasSizes) {
+      if (article.hasVariants) {
         throw new ConflictException(
-          'Article amb talles: ajustar via formulari',
+          'Article amb variants: ajustar via formulari',
         );
       }
     }
@@ -256,9 +256,9 @@ export class AlbaranesService {
             `Artículo con ID ${itemDto.articleId} no encontrado`,
           );
         }
-        if (article.hasSizes) {
+        if (article.hasVariants) {
           throw new ConflictException(
-            'Article amb talles: ajustar via formulari',
+            'Article amb variants: ajustar via formulari',
           );
         }
 

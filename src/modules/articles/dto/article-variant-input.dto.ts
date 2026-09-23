@@ -8,16 +8,16 @@ import {
   Min,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { normalizeSizeLabel } from '../articles-sizes.util';
+import { normalizeVariantLabel } from '../articles-variants.util';
 
-export class ArticleSizeInputDto {
+export class ArticleVariantInputDto {
   @IsOptional()
   @IsUUID()
   id?: string;
 
   @IsString()
   @MaxLength(50)
-  @Transform(({ value }) => normalizeSizeLabel(String(value ?? '')))
+  @Transform(({ value }) => normalizeVariantLabel(String(value ?? '')))
   label: string;
 
   @IsOptional()

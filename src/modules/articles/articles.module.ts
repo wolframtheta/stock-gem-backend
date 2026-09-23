@@ -11,10 +11,10 @@ import { SalesPoint } from '../sales-points/entities/sales-point.entity';
 import { Collection } from '../config/entities/collection.entity';
 import { ArticleType } from '../config/entities/article-type.entity';
 import { FairStock } from '../fairs/entities/fair-stock.entity';
-import { FairSizeStock } from '../fairs/entities/fair-size-stock.entity';
-import { SalesPointSizeStock } from '../sales-points/entities/sales-point-size-stock.entity';
-import { ArticleSize } from './entities/article-size.entity';
-import { ArticleSizeStock } from './entities/article-size-stock.entity';
+import { FairVariantStock } from '../fairs/entities/fair-variant-stock.entity';
+import { SalesPointVariantStock } from '../sales-points/entities/sales-point-variant-stock.entity';
+import { ArticleVariant } from './entities/article-variant.entity';
+import { ArticleVariantStock } from './entities/article-variant-stock.entity';
 import { SalesPointsModule } from '../sales-points/sales-points.module';
 
 @Module({
@@ -22,17 +22,17 @@ import { SalesPointsModule } from '../sales-points/sales-points.module';
     TypeOrmModule.forFeature([
       Article,
       ArticlePhoto,
-      ArticleSize,
-      ArticleSizeStock,
+      ArticleVariant,
+      ArticleVariantStock,
       ArticlePriceHistory,
       ArticleStockHistory,
       SalesPointStock,
-      SalesPointSizeStock,
+      SalesPointVariantStock,
       SalesPoint,
       Collection,
       ArticleType,
       FairStock,
-      FairSizeStock,
+      FairVariantStock,
     ]),
     SalesPointsModule,
   ],

@@ -8,15 +8,15 @@ import {
 } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Article } from './article.entity';
-import { ArticleSizeStock } from './article-size-stock.entity';
+import { ArticleVariantStock } from './article-variant-stock.entity';
 
-@Entity('article_sizes')
-@Index('idx_article_sizes_article_id', ['articleId'])
-export class ArticleSize extends BaseEntity {
+@Entity('article_variants')
+@Index('idx_article_variants_article_id', ['articleId'])
+export class ArticleVariant extends BaseEntity {
   @Column({ name: 'article_id', type: 'uuid' })
   articleId: string;
 
-  @ManyToOne(() => Article, (article) => article.sizes, {
+  @ManyToOne(() => Article, (article) => article.variants, {
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'article_id' })
@@ -28,6 +28,6 @@ export class ArticleSize extends BaseEntity {
   @Column({ name: 'sort_order', type: 'int', default: 0 })
   sortOrder: number;
 
-  @OneToOne(() => ArticleSizeStock, (stock) => stock.articleSize)
-  sizeStock?: ArticleSizeStock;
+  @OneToOne(() => ArticleVariantStock, (stock) => stock.articleVariant)
+  variantStock?: ArticleVariantStock;
 }

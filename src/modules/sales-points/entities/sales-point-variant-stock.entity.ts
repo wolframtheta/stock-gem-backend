@@ -1,11 +1,11 @@
 import { Entity, Column, ManyToOne, JoinColumn, Unique } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { SalesPoint } from './sales-point.entity';
-import { ArticleSize } from '../../articles/entities/article-size.entity';
+import { ArticleVariant } from '../../articles/entities/article-variant.entity';
 
-@Entity('sales_point_size_stock')
-@Unique(['salesPointId', 'articleSizeId'])
-export class SalesPointSizeStock extends BaseEntity {
+@Entity('sales_point_variant_stock')
+@Unique(['salesPointId', 'articleVariantId'])
+export class SalesPointVariantStock extends BaseEntity {
   @Column({ name: 'sales_point_id', type: 'uuid' })
   salesPointId: string;
 
@@ -13,12 +13,12 @@ export class SalesPointSizeStock extends BaseEntity {
   @JoinColumn({ name: 'sales_point_id' })
   salesPoint: SalesPoint;
 
-  @Column({ name: 'article_size_id', type: 'uuid' })
-  articleSizeId: string;
+  @Column({ name: 'article_variant_id', type: 'uuid' })
+  articleVariantId: string;
 
-  @ManyToOne(() => ArticleSize, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'article_size_id' })
-  articleSize: ArticleSize;
+  @ManyToOne(() => ArticleVariant, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'article_variant_id' })
+  articleVariant: ArticleVariant;
 
   @Column({ type: 'int', default: 0 })
   quantity: number;
