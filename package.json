@@ -37,7 +37,9 @@
     "migration:create": "pnpm typeorm migration:create",
     "seed:superadmin": "ts-node -r tsconfig-paths/register scripts/seed-superadmin.ts",
     "migrate:article-descriptions-to-observations": "ts-node -r tsconfig-paths/register scripts/migrate-article-descriptions-to-observations.ts",
-    "migrate:article-descriptions-to-observations:pro": "STOCK_GEM_ENV=pro ts-node -r tsconfig-paths/register scripts/migrate-article-descriptions-to-observations.ts"
+    "migrate:article-descriptions-to-observations:pro": "STOCK_GEM_ENV=pro ts-node -r tsconfig-paths/register scripts/migrate-article-descriptions-to-observations.ts",
+    "migrate:article-descriptions-to-observations:dist": "node scripts/migrate-article-descriptions-to-observations-dist.cjs",
+    "migrate:article-descriptions-to-observations:dist:pro": "STOCK_GEM_ENV=pro node scripts/migrate-article-descriptions-to-observations-dist.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

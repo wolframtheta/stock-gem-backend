@@ -24,6 +24,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY scripts/typeorm-migration-dist.cjs ./scripts/typeorm-migration-dist.cjs
 COPY scripts/migration-baseline.cjs ./scripts/migration-baseline.cjs
+COPY scripts/migrate-article-descriptions-to-observations-dist.cjs ./scripts/migrate-article-descriptions-to-observations-dist.cjs
 
 ENV NODE_ENV=production
 
