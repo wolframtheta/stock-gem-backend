@@ -18,6 +18,12 @@ export class RenameSizesToVariants1731040000000 implements MigrationInterface {
           WHERE table_schema = 'public' AND table_name = 'articles' AND column_name = 'has_variants'
         ) THEN
           ALTER TABLE "articles" RENAME COLUMN "has_sizes" TO "has_variants";
+        ELSIF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = 'articles' AND column_name = 'has_variants'
+        ) THEN
+          ALTER TABLE "articles"
+          ADD COLUMN "has_variants" boolean NOT NULL DEFAULT false;
         END IF;
       END $$;
     `);
