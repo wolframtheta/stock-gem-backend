@@ -4,13 +4,15 @@ import { FairsService } from './fairs.service';
 import { FairsController } from './fairs.controller';
 import { Fair } from './entities/fair.entity';
 import { FairStock } from './entities/fair-stock.entity';
+import { FairVariantStock } from './entities/fair-variant-stock.entity';
 import { Article } from '../articles/entities/article.entity';
+import { ArticleVariant } from '../articles/entities/article-variant.entity';
 import { SalesPointsModule } from '../sales-points/sales-points.module';
 import { StatisticsModule } from '../statistics/statistics.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Fair, FairStock, Article]),
+    TypeOrmModule.forFeature([Fair, FairStock, FairVariantStock, Article, ArticleVariant]),
     forwardRef(() => SalesPointsModule),
     StatisticsModule,
   ],

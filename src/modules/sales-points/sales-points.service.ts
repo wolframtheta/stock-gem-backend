@@ -15,6 +15,28 @@ import { CreateSalesPointDto } from './dto/create-sales-point.dto';
 import { UpdateSalesPointDto } from './dto/update-sales-point.dto';
 import { AssignStockDto, AssignStockBatchDto } from './dto/assign-stock.dto';
 import { FairsService } from '../fairs/fairs.service';
+import { ArticleVariant } from '../articles/entities/article-variant.entity';
+import { ArticleVariantStock } from '../articles/entities/article-variant-stock.entity';
+import { SalesPointVariantStock } from './entities/sales-point-variant-stock.entity';
+import { MoveStockItemDto } from './dto/move-stock.dto';
+import {
+  assertMoveItemShape,
+  MoveStockVariantLine,
+  normalizeMoveVariantLines,
+} from './stock-move-variants.util';
+
+export interface StockVariantLineView {
+  articleVariantId: string;
+  label: string;
+  sortOrder: number;
+  quantity: number;
+  maxQuantity: number;
+}
+
+export type SalesPointStockEnriched = SalesPointStock & {
+  maxQuantity: number;
+  variants?: StockVariantLineView[];
+};
 
 @Injectable()
 export class SalesPointsService {
@@ -23,6 +45,12 @@ export class SalesPointsService {
     private salesPointRepository: Repository<SalesPoint>,
     @InjectRepository(SalesPointStock)
     private stockRepository: Repository<SalesPointStock>,
+    @InjectRepository(SalesPointVariantStock)
+    private salesPointVariantStockRepository: Repository<SalesPointVariantStock>,
+    @InjectRepository(ArticleVariant)
+    private articleVariantRepository: Repository<ArticleVariant>,
+    @InjectRepository(ArticleVariantStock)
+    private articleVariantStockRepository: Repository<ArticleVariantStock>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
     @InjectRepository(FairStock)
@@ -120,33 +148,313 @@ export class SalesPointsService {
 
   async getStockWithLimits(
     salesPointId: string,
-  ): Promise<(SalesPointStock & { maxQuantity: number })[]> {
+  ): Promise<SalesPointStockEnriched[]> {
     const items = await this.getStock(salesPointId);
     const warehouse = await this.getDefaultWarehouse();
-    if (!warehouse) {
-      return items.map((i) => ({ ...i, maxQuantity: i.quantity }));
-    }
-
-    const isWarehouse = salesPointId === warehouse.id;
-    const result: (SalesPointStock & { maxQuantity: number })[] = [];
+    const isWarehouse = warehouse ? salesPointId === warehouse.id : false;
+    const result: SalesPointStockEnriched[] = [];
 
     for (const item of items) {
       let maxQuantity: number;
-      if (isWarehouse) {
-        // Al magatzem: màxim = actual + stock no assignat (considera punts + fires)
+      if (!warehouse) {
+        maxQuantity = item.quantity;
+      } else if (isWarehouse) {
         const unassigned = await this.getUnassignedStock(item.articleId);
         maxQuantity = item.quantity + unassigned;
       } else {
-        // Punt de venta: màxim = actual + stock al magatzem (origen)
         const warehouseStock = await this.getStockAtPoint(
           warehouse.id,
           item.articleId,
         );
         maxQuantity = item.quantity + warehouseStock;
       }
-      result.push({ ...item, maxQuantity });
+
+      const enriched: SalesPointStockEnriched = { ...item, maxQuantity };
+      if (item.article?.hasVariants) {
+        enriched.variants = await this.buildVariantLinesForSalesPoint(
+          item.articleId,
+          salesPointId,
+          warehouse?.id ?? null,
+        );
+      }
+      result.push(enriched);
     }
     return result;
+  }
+
+  async buildVariantLinesForSalesPoint(
+    articleId: string,
+    salesPointId: string,
+    warehouseId: string | null,
+  ): Promise<StockVariantLineView[]> {
+    const variants = await this.articleVariantRepository.find({
+      where: { articleId },
+      order: { sortOrder: 'ASC', label: 'ASC' },
+    });
+    const isWarehouse = warehouseId !== null && salesPointId === warehouseId;
+    const lines: StockVariantLineView[] = [];
+
+    for (const variant of variants) {
+      const quantity = await this.getVariantQuantityAtPoint(
+        salesPointId,
+        variant.id,
+        warehouseId,
+      );
+      if (quantity <= 0 && !isWarehouse) {
+        continue;
+      }
+      lines.push({
+        articleVariantId: variant.id,
+        label: variant.label,
+        sortOrder: variant.sortOrder,
+        quantity,
+        maxQuantity: quantity,
+      });
+    }
+    return lines;
+  }
+
+  async getVariantQuantityAtPoint(
+    salesPointId: string,
+    articleVariantId: string,
+    warehouseId: string | null,
+  ): Promise<number> {
+    if (warehouseId && salesPointId === warehouseId) {
+      const row = await this.articleVariantStockRepository.findOne({
+        where: { articleVariantId },
+      });
+      return row?.quantity ?? 0;
+    }
+    const row = await this.salesPointVariantStockRepository.findOne({
+      where: { salesPointId, articleVariantId },
+    });
+    return row?.quantity ?? 0;
+  }
+
+  private async getVariantIdsForArticle(articleId: string): Promise<Set<string>> {
+    const rows = await this.articleVariantRepository.find({
+      where: { articleId },
+      select: ['id'],
+    });
+    return new Set(rows.map((r) => r.id));
+  }
+
+  private async syncSalesPointAggregate(
+    salesPointId: string,
+    articleId: string,
+  ): Promise<void> {
+    const variants = await this.articleVariantRepository.find({
+      where: { articleId },
+      select: ['id'],
+    });
+    let total = 0;
+    const warehouse = await this.getDefaultWarehouse();
+    for (const v of variants) {
+      total += await this.getVariantQuantityAtPoint(
+        salesPointId,
+        v.id,
+        warehouse?.id ?? null,
+      );
+    }
+    const existing = await this.stockRepository.findOne({
+      where: { salesPointId, articleId },
+    });
+    if (total <= 0) {
+      if (existing) {
+        await this.stockRepository.remove(existing);
+      }
+      return;
+    }
+    if (existing) {
+      existing.quantity = total;
+      await this.stockRepository.save(existing);
+    } else {
+      await this.stockRepository.save(
+        this.stockRepository.create({ salesPointId, articleId, quantity: total }),
+      );
+    }
+  }
+
+  async restoreWarehouseVariantFromFair(
+    articleVariantId: string,
+    quantity: number,
+    articleId: string,
+  ): Promise<void> {
+    await this.restoreWarehouseVariant(articleVariantId, quantity, articleId);
+  }
+
+  async reduceWarehouseVariantForFair(
+    articleVariantId: string,
+    quantity: number,
+    articleId: string,
+  ): Promise<void> {
+    await this.reduceWarehouseVariant(articleVariantId, quantity, articleId);
+  }
+
+  private async reduceWarehouseVariant(
+    articleVariantId: string,
+    quantity: number,
+    articleId: string,
+  ): Promise<void> {
+    const row = await this.articleVariantStockRepository.findOne({
+      where: { articleVariantId },
+    });
+    if (!row || row.quantity < quantity) {
+      throw new BadRequestException(
+        `Stock insuficient de variant al magatzem. Disponible: ${row?.quantity ?? 0}`,
+      );
+    }
+    row.quantity -= quantity;
+    if (row.quantity === 0) {
+      await this.articleVariantStockRepository.save(row);
+    } else {
+      await this.articleVariantStockRepository.save(row);
+    }
+    const warehouse = await this.getDefaultWarehouse();
+    if (warehouse) {
+      await this.syncSalesPointAggregate(warehouse.id, articleId);
+    }
+  }
+
+  private async restoreWarehouseVariant(
+    articleVariantId: string,
+    quantity: number,
+    articleId: string,
+  ): Promise<void> {
+    let row = await this.articleVariantStockRepository.findOne({
+      where: { articleVariantId },
+    });
+    if (!row) {
+      row = this.articleVariantStockRepository.create({
+        articleVariantId,
+        quantity,
+      });
+    } else {
+      row.quantity += quantity;
+    }
+    await this.articleVariantStockRepository.save(row);
+    const warehouse = await this.getDefaultWarehouse();
+    if (warehouse) {
+      await this.syncSalesPointAggregate(warehouse.id, articleId);
+    }
+  }
+
+  private async reduceVariantAtSalesPoint(
+    salesPointId: string,
+    articleVariantId: string,
+    quantity: number,
+    articleId: string,
+    warehouseId: string | null,
+  ): Promise<void> {
+    if (warehouseId && salesPointId === warehouseId) {
+      await this.reduceWarehouseVariant(articleVariantId, quantity, articleId);
+      return;
+    }
+    const row = await this.salesPointVariantStockRepository.findOne({
+      where: { salesPointId, articleVariantId },
+    });
+    if (!row || row.quantity < quantity) {
+      throw new BadRequestException(
+        `Stock insuficient de variant al punt. Disponible: ${row?.quantity ?? 0}`,
+      );
+    }
+    row.quantity -= quantity;
+    if (row.quantity === 0) {
+      await this.salesPointVariantStockRepository.remove(row);
+    } else {
+      await this.salesPointVariantStockRepository.save(row);
+    }
+    await this.syncSalesPointAggregate(salesPointId, articleId);
+  }
+
+  private async restoreVariantAtSalesPoint(
+    salesPointId: string,
+    articleVariantId: string,
+    quantity: number,
+    articleId: string,
+    warehouseId: string | null,
+  ): Promise<void> {
+    if (warehouseId && salesPointId === warehouseId) {
+      await this.restoreWarehouseVariant(articleVariantId, quantity, articleId);
+      return;
+    }
+    let row = await this.salesPointVariantStockRepository.findOne({
+      where: { salesPointId, articleVariantId },
+    });
+    if (!row) {
+      row = this.salesPointVariantStockRepository.create({
+        salesPointId,
+        articleVariantId,
+        quantity,
+      });
+    } else {
+      row.quantity += quantity;
+    }
+    await this.salesPointVariantStockRepository.save(row);
+    await this.syncSalesPointAggregate(salesPointId, articleId);
+  }
+
+  private async getVariantQtyAtFrom(
+    fromType: 'point' | 'fair',
+    fromId: string,
+    articleVariantId: string,
+    articleId: string,
+    warehouseId: string | null,
+  ): Promise<number> {
+    if (fromType === 'fair') {
+      return this.fairsService.getVariantQuantityAtFair(fromId, articleVariantId);
+    }
+    return this.getVariantQuantityAtPoint(fromId, articleVariantId, warehouseId);
+  }
+
+  private async reduceVariantFrom(
+    fromType: 'point' | 'fair',
+    fromId: string,
+    line: MoveStockVariantLine,
+    articleId: string,
+    warehouseId: string | null,
+  ): Promise<void> {
+    if (fromType === 'fair') {
+      await this.fairsService.reduceFairVariant(
+        fromId,
+        line.articleVariantId,
+        line.quantity,
+        articleId,
+      );
+      return;
+    }
+    await this.reduceVariantAtSalesPoint(
+      fromId,
+      line.articleVariantId,
+      line.quantity,
+      articleId,
+      warehouseId,
+    );
+  }
+
+  private async restoreVariantTo(
+    toType: 'point' | 'fair',
+    toId: string,
+    line: MoveStockVariantLine,
+    articleId: string,
+    warehouseId: string | null,
+  ): Promise<void> {
+    if (toType === 'fair') {
+      await this.fairsService.restoreFairVariant(
+        toId,
+        line.articleVariantId,
+        line.quantity,
+        articleId,
+      );
+      return;
+    }
+    await this.restoreVariantAtSalesPoint(
+      toId,
+      line.articleVariantId,
+      line.quantity,
+      articleId,
+      warehouseId,
+    );
   }
 
   async getAvailableStock(articleId: string): Promise<number> {
@@ -471,42 +779,105 @@ export class SalesPointsService {
     fromId: string,
     toType: 'point' | 'fair',
     toId: string,
-    items: { articleId: string; quantity: number }[],
+    items: MoveStockItemDto[],
   ): Promise<void> {
-    const getStockAtFrom =
-      fromType === 'fair'
-        ? (id: string, artId: string) =>
-            this.fairsService.getStockAtFair(id, artId)
-        : (id: string, artId: string) => this.getStockAtPoint(id, artId);
+    const warehouse = await this.getDefaultWarehouse();
+    const warehouseId = warehouse?.id ?? null;
 
     for (const item of items) {
-      const stockAtFrom = await getStockAtFrom(fromId, item.articleId);
-      if (stockAtFrom < item.quantity) {
-        throw new BadRequestException(
-          `Stock insuficient per l'article ${item.articleId}. Disponible: ${stockAtFrom}`,
-        );
+      const article = await this.articleRepository.findOne({
+        where: { id: item.articleId },
+      });
+      if (!article) {
+        throw new NotFoundException(`Article ${item.articleId} no trobat`);
+      }
+
+      assertMoveItemShape(
+        article.hasVariants,
+        item.quantity,
+        item.variants,
+      );
+
+      if (article.hasVariants) {
+        const allowed = await this.getVariantIdsForArticle(item.articleId);
+        const lines = normalizeMoveVariantLines(item.variants!, allowed);
+        for (const line of lines) {
+          const available = await this.getVariantQtyAtFrom(
+            fromType,
+            fromId,
+            line.articleVariantId,
+            item.articleId,
+            warehouseId,
+          );
+          if (available < line.quantity) {
+            throw new BadRequestException(
+              `Stock insuficient per variant ${line.articleVariantId}. Disponible: ${available}`,
+            );
+          }
+        }
+      } else {
+        const getStockAtFrom =
+          fromType === 'fair'
+            ? (id: string, artId: string) =>
+                this.fairsService.getStockAtFair(id, artId)
+            : (id: string, artId: string) => this.getStockAtPoint(id, artId);
+        const stockAtFrom = await getStockAtFrom(fromId, item.articleId);
+        if (stockAtFrom < item.quantity!) {
+          throw new BadRequestException(
+            `Stock insuficient per l'article ${item.articleId}. Disponible: ${stockAtFrom}`,
+          );
+        }
       }
     }
 
     for (const item of items) {
+      const article = await this.articleRepository.findOne({
+        where: { id: item.articleId },
+      });
+      if (!article) {
+        continue;
+      }
+
+      if (article.hasVariants) {
+        const allowed = await this.getVariantIdsForArticle(item.articleId);
+        const lines = normalizeMoveVariantLines(item.variants!, allowed);
+        for (const line of lines) {
+          await this.reduceVariantFrom(
+            fromType,
+            fromId,
+            line,
+            item.articleId,
+            warehouseId,
+          );
+          await this.restoreVariantTo(
+            toType,
+            toId,
+            line,
+            item.articleId,
+            warehouseId,
+          );
+        }
+        continue;
+      }
+
       if (fromType === 'fair') {
         await this.fairsService.reduceFairStock(
           fromId,
           item.articleId,
-          item.quantity,
+          item.quantity!,
         );
       } else {
-        await this.reduceStock(fromId, item.articleId, item.quantity);
+        await this.reduceStock(fromId, item.articleId, item.quantity!);
       }
 
       if (toType === 'fair') {
         await this.fairsService.restoreFairStock(
           toId,
           item.articleId,
-          item.quantity,
+          item.quantity!,
         );
       } else {
-        await this.restoreStock(toId, item.articleId, item.quantity);
+        await this.restoreStock(toId, item.articleId, item.quantity!);
       }
     }
   }
