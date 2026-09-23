@@ -29,11 +29,10 @@ RUN pnpm install --frozen-lockfile --prod \
 
 COPY --from=builder /app/dist ./dist
 COPY scripts/typeorm-migration-dist.cjs ./scripts/typeorm-migration-dist.cjs
-COPY scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
-RUN chmod +x ./scripts/docker-entrypoint.sh
 
 ENV NODE_ENV=production
 
 EXPOSE 3000
 
-ENTRYPOINT ["./scripts/docker-entrypoint.sh"]
+# Coolify Pre-deployment: pnpm run migration:run:dist  (DB_* al servei)
+CMD ["node", "dist/src/main.js"]
