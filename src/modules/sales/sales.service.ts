@@ -13,7 +13,15 @@ import { SearchSaleDto } from './dto/search-sale.dto';
 import { Client } from '../clients/entities/client.entity';
 import { User } from '../auth/entities/user.entity';
 import { Article } from '../articles/entities/article.entity';
+import { ArticleVariant } from '../articles/entities/article-variant.entity';
 import { SalesPointsService } from '../sales-points/sales-points.service';
+import { FairsService } from '../fairs/fairs.service';
+import { Fair } from '../fairs/entities/fair.entity';
+import { SalesPoint } from '../sales-points/entities/sales-point.entity';
+import {
+  assertSaleItemVariantRules,
+  resolveSaleLocation,
+} from './create-sale-location.util';
 
 @Injectable()
 export class SalesService {
@@ -28,23 +36,26 @@ export class SalesService {
     private userRepository: Repository<User>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
+    @InjectRepository(ArticleVariant)
+    private articleVariantRepository: Repository<ArticleVariant>,
     private salesPointsService: SalesPointsService,
+    private fairsService: FairsService,
   ) {}
 
   async create(createSaleDto: CreateSaleDto): Promise<Sale> {
-    // Generar número de venta automáticamente
-    const saleNumber = await this.generateSaleNumber();
+    const location = resolveSaleLocation(
+      createSaleDto.salesPointId,
+      createSaleDto.fairId,
+    );
 
-    // Generar número de ticket automáticamente
+    const saleNumber = await this.generateSaleNumber();
     const ticketNumber = await this.generateTicketNumber();
 
-    // Verificar cliente si se proporciona
     let client: Client | null = null;
     if (createSaleDto.clientId) {
       client = await this.clientRepository.findOne({
         where: { id: createSaleDto.clientId },
       });
-
       if (!client) {
         throw new NotFoundException(
           `Cliente con ID ${createSaleDto.clientId} no encontrado`,
@@ -52,13 +63,11 @@ export class SalesService {
       }
     }
 
-    // Verificar vendedor si se proporciona
     let seller: User | null = null;
     if (createSaleDto.sellerId) {
       seller = await this.userRepository.findOne({
         where: { id: createSaleDto.sellerId },
       });
-
       if (!seller) {
         throw new NotFoundException(
           `Usuario con ID ${createSaleDto.sellerId} no encontrado`,
@@ -66,42 +75,53 @@ export class SalesService {
       }
     }
 
-    // Verificar punto de venta
-    const salesPoint = await this.salesPointsService.findOne(
-      createSaleDto.salesPointId,
-    );
+    let salesPoint: SalesPoint | null = null;
+    let fair: Fair | null = null;
+    if (location.kind === 'point') {
+      salesPoint = await this.salesPointsService.findOne(location.salesPointId);
+    } else {
+      fair = await this.fairsService.findOne(location.fairId);
+    }
 
-    // Verificar artículos y stock en el punto de venta
     for (const itemDto of createSaleDto.items) {
       const article = await this.articleRepository.findOne({
         where: { id: itemDto.articleId },
       });
-
       if (!article) {
         throw new NotFoundException(
           `Artículo con ID ${itemDto.articleId} no encontrado`,
         );
       }
 
-      const stockAtPoint = await this.salesPointsService.getStockAtPoint(
-        createSaleDto.salesPointId,
-        itemDto.articleId,
-      );
+      assertSaleItemVariantRules(article.hasVariants, itemDto.articleVariantId);
 
-      if (stockAtPoint < itemDto.quantity) {
-        throw new BadRequestException(
-          `Stock insuficiente en el punto de venta para el artículo ${article.ownReference}. Stock disponible: ${stockAtPoint}`,
-        );
+      if (itemDto.articleVariantId) {
+        const variant = await this.articleVariantRepository.findOne({
+          where: { id: itemDto.articleVariantId, articleId: article.id },
+        });
+        if (!variant) {
+          throw new BadRequestException(
+            `La variant ${itemDto.articleVariantId} no pertany a l'article`,
+          );
+        }
       }
+
+      await this.assertStockForSale(
+        location,
+        article,
+        itemDto.quantity,
+        itemDto.articleVariantId,
+      );
     }
 
-    // Crear la venta
     const sale = this.saleRepository.create({
       salesPoint,
-      saleNumber: saleNumber,
-      ticketNumber: ticketNumber,
-      client: client,
-      seller: seller,
+      fair,
+      fairId: fair?.id ?? null,
+      saleNumber,
+      ticketNumber,
+      client,
+      seller,
       saleDate: new Date(createSaleDto.saleDate),
       saleTime: createSaleDto.saleTime || null,
       paymentType: createSaleDto.paymentType,
@@ -111,8 +131,6 @@ export class SalesService {
 
     const savedSale = await this.saleRepository.save(sale);
 
-    // Crear los items y actualizar stock
-    const items: SaleItem[] = [];
     for (const itemDto of createSaleDto.items) {
       const article = await this.articleRepository.findOne({
         where: { id: itemDto.articleId },
@@ -121,35 +139,170 @@ export class SalesService {
       const saleItem = this.saleItemRepository.create({
         sale: savedSale,
         article: article!,
+        articleVariantId: itemDto.articleVariantId ?? null,
         quantity: itemDto.quantity,
         unitPrice: itemDto.unitPrice,
         discount: itemDto.discount,
         totalPrice: itemDto.totalPrice,
       });
 
-      const savedItem = await this.saleItemRepository.save(saleItem);
-      items.push(savedItem);
+      await this.saleItemRepository.save(saleItem);
 
-      // Reducir stock en punto de venta y total
-      await this.salesPointsService.reduceStock(
-        createSaleDto.salesPointId,
-        itemDto.articleId,
+      await this.deductStockForSale(
+        location,
+        article!,
         itemDto.quantity,
+        itemDto.articleVariantId,
       );
+
       article!.stock -= itemDto.quantity;
       await this.articleRepository.save(article!);
     }
 
-    // Cargar la venta con relaciones
     return this.saleRepository.findOne({
       where: { id: savedSale.id },
-      relations: ['salesPoint', 'client', 'seller', 'items', 'items.article'],
+      relations: [
+        'salesPoint',
+        'fair',
+        'client',
+        'seller',
+        'items',
+        'items.article',
+      ],
     }) as Promise<Sale>;
+  }
+
+  private async assertStockForSale(
+    location: ReturnType<typeof resolveSaleLocation>,
+    article: Article,
+    quantity: number,
+    articleVariantId?: string,
+  ): Promise<void> {
+    if (location.kind === 'point') {
+      if (article.hasVariants && articleVariantId) {
+        const warehouse = await this.salesPointsService.getDefaultWarehouse();
+        const available =
+          await this.salesPointsService.getVariantQuantityAtPoint(
+            location.salesPointId,
+            articleVariantId,
+            warehouse?.id ?? null,
+          );
+        if (available < quantity) {
+          throw new BadRequestException(
+            `Stock insuficient de variant al punt per ${article.ownReference}. Disponible: ${available}`,
+          );
+        }
+        return;
+      }
+      const stockAtPoint = await this.salesPointsService.getStockAtPoint(
+        location.salesPointId,
+        article.id,
+      );
+      if (stockAtPoint < quantity) {
+        throw new BadRequestException(
+          `Stock insuficiente en el punto de venta para el artículo ${article.ownReference}. Stock disponible: ${stockAtPoint}`,
+        );
+      }
+      return;
+    }
+
+    if (article.hasVariants && articleVariantId) {
+      const available = await this.fairsService.getVariantQuantityAtFair(
+        location.fairId,
+        articleVariantId,
+      );
+      if (available < quantity) {
+        throw new BadRequestException(
+          `Stock insuficient de variant a la fira per ${article.ownReference}. Disponible: ${available}`,
+        );
+      }
+      return;
+    }
+
+    const stockAtFair = await this.fairsService.getStockAtFair(
+      location.fairId,
+      article.id,
+    );
+    if (stockAtFair < quantity) {
+      throw new BadRequestException(
+        `Stock insuficient a la fira per ${article.ownReference}. Disponible: ${stockAtFair}`,
+      );
+    }
+  }
+
+  private async deductStockForSale(
+    location: ReturnType<typeof resolveSaleLocation>,
+    article: Article,
+    quantity: number,
+    articleVariantId?: string,
+  ): Promise<void> {
+    if (location.kind === 'point') {
+      await this.salesPointsService.deductStockForSale(
+        location.salesPointId,
+        article.id,
+        quantity,
+        article.hasVariants,
+        articleVariantId,
+      );
+      return;
+    }
+
+    if (article.hasVariants && articleVariantId) {
+      await this.fairsService.reduceFairVariant(
+        location.fairId,
+        articleVariantId,
+        quantity,
+        article.id,
+      );
+    } else {
+      await this.fairsService.reduceFairStock(
+        location.fairId,
+        article.id,
+        quantity,
+      );
+    }
+  }
+
+  private async restoreStockForSale(sale: Sale, item: SaleItem): Promise<void> {
+    const article = await this.articleRepository.findOne({
+      where: { id: item.articleId },
+    });
+    if (!article) {
+      return;
+    }
+
+    if (sale.fairId) {
+      if (article.hasVariants && item.articleVariantId) {
+        await this.fairsService.restoreFairVariant(
+          sale.fairId,
+          item.articleVariantId,
+          item.quantity,
+          item.articleId,
+        );
+      } else {
+        await this.fairsService.restoreFairStock(
+          sale.fairId,
+          item.articleId,
+          item.quantity,
+        );
+      }
+    } else if (sale.salesPointId) {
+      await this.salesPointsService.restoreStockForSale(
+        sale.salesPointId,
+        item.articleId,
+        item.quantity,
+        article.hasVariants,
+        item.articleVariantId,
+      );
+    }
+
+    article.stock += item.quantity;
+    await this.articleRepository.save(article);
   }
 
   async findAll(): Promise<Sale[]> {
     return this.saleRepository.find({
-      relations: ['salesPoint', 'client', 'seller', 'items', 'items.article'],
+      relations: ['salesPoint', 'fair', 'client', 'seller', 'items', 'items.article'],
       order: { saleDate: 'DESC', createdAt: 'DESC' },
     });
   }
@@ -157,7 +310,7 @@ export class SalesService {
   async findOne(id: string): Promise<Sale> {
     const sale = await this.saleRepository.findOne({
       where: { id },
-      relations: ['salesPoint', 'client', 'seller', 'items', 'items.article'],
+      relations: ['salesPoint', 'fair', 'client', 'seller', 'items', 'items.article'],
     });
 
     if (!sale) {
@@ -171,6 +324,7 @@ export class SalesService {
     const queryBuilder = this.saleRepository
       .createQueryBuilder('sale')
       .leftJoinAndSelect('sale.salesPoint', 'salesPoint')
+      .leftJoinAndSelect('sale.fair', 'fair')
       .leftJoinAndSelect('sale.client', 'client')
       .leftJoinAndSelect('sale.seller', 'seller')
       .leftJoinAndSelect('sale.items', 'items')
@@ -234,7 +388,7 @@ export class SalesService {
       where: {
         saleDate: Between(startOfDay, endOfDay),
       },
-      relations: ['salesPoint', 'client', 'seller', 'items', 'items.article'],
+      relations: ['salesPoint', 'fair', 'client', 'seller', 'items', 'items.article'],
       order: { saleTime: 'ASC', createdAt: 'ASC' },
     });
   }
@@ -242,9 +396,6 @@ export class SalesService {
   async update(id: string, updateSaleDto: UpdateSaleDto): Promise<Sale> {
     const sale = await this.findOne(id);
 
-    // No se permite actualizar saleNumber ni ticketNumber (son generados automáticamente)
-
-    // Actualizar cliente si se proporciona
     if (updateSaleDto.clientId !== undefined) {
       if (updateSaleDto.clientId === null) {
         sale.client = null;
@@ -263,7 +414,6 @@ export class SalesService {
       }
     }
 
-    // Actualizar vendedor si se proporciona
     if (updateSaleDto.sellerId !== undefined) {
       if (updateSaleDto.sellerId === null) {
         sale.seller = null;
@@ -282,7 +432,6 @@ export class SalesService {
       }
     }
 
-    // Actualizar otros campos (saleNumber y ticketNumber no se pueden actualizar)
     Object.assign(sale, {
       saleDate: updateSaleDto.saleDate
         ? new Date(updateSaleDto.saleDate)
@@ -299,20 +448,8 @@ export class SalesService {
   async remove(id: string): Promise<void> {
     const sale = await this.findOne(id);
 
-    // Restaurar stock en punto de venta y total
     for (const item of sale.items) {
-      await this.salesPointsService.restoreStock(
-        sale.salesPointId,
-        item.articleId,
-        item.quantity,
-      );
-      const article = await this.articleRepository.findOne({
-        where: { id: item.articleId },
-      });
-      if (article) {
-        article.stock += item.quantity;
-        await this.articleRepository.save(article);
-      }
+      await this.restoreStockForSale(sale, item);
     }
 
     await this.saleRepository.remove(sale);
@@ -323,7 +460,6 @@ export class SalesService {
     const year = today.getFullYear();
     const month = String(today.getMonth() + 1).padStart(2, '0');
 
-    // Buscar el último número de venta del mes
     const lastSale = await this.saleRepository.findOne({
       where: {
         saleNumber: Like(`V${year}${month}%`),
@@ -346,7 +482,6 @@ export class SalesService {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const day = String(today.getDate()).padStart(2, '0');
 
-    // Buscar el último número de ticket del día
     const startOfDay = new Date(today);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(today);

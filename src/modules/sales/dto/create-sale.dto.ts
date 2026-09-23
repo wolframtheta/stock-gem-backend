@@ -20,8 +20,13 @@ export class CreateSaleDto {
   // saleNumber se genera automáticamente, no se envía desde el frontend
   // ticketNumber se genera automáticamente, no se envía desde el frontend
 
+  @IsOptional()
   @Matches(UUID_REGEX, { message: 'salesPointId must be a UUID' })
-  salesPointId: string;
+  salesPointId?: string;
+
+  @IsOptional()
+  @Matches(UUID_REGEX, { message: 'fairId must be a UUID' })
+  fairId?: string;
 
   @IsOptional()
   @Matches(UUID_REGEX, { message: 'clientId must be a UUID' })

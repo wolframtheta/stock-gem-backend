@@ -28,12 +28,12 @@ export enum PaymentType {
 @Index('idx_sales_sale_date', ['saleDate'])
 @Index('idx_sales_sales_point_id', ['salesPoint'])
 export class Sale extends BaseEntity {
-  @ManyToOne(() => SalesPoint, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => SalesPoint, { nullable: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'sales_point_id' })
-  salesPoint: SalesPoint;
+  salesPoint: SalesPoint | null;
 
-  @Column({ name: 'sales_point_id' })
-  salesPointId: string;
+  @Column({ name: 'sales_point_id', nullable: true })
+  salesPointId: string | null;
 
   @ManyToOne(() => Fair, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'fair_id' })

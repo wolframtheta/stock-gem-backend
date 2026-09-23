@@ -2,6 +2,7 @@ import { Entity, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Sale } from './sale.entity';
 import { Article } from '../../articles/entities/article.entity';
+import { ArticleVariant } from '../../articles/entities/article-variant.entity';
 
 @Entity('sale_items')
 @Index('idx_sale_items_sale_id', ['sale'])
@@ -20,6 +21,13 @@ export class SaleItem extends BaseEntity {
 
   @Column({ name: 'article_id' })
   articleId: string;
+
+  @ManyToOne(() => ArticleVariant, { nullable: true, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'article_variant_id' })
+  articleVariant: ArticleVariant | null;
+
+  @Column({ name: 'article_variant_id', nullable: true })
+  articleVariantId: string | null;
 
   @Column({ type: 'int', default: 1 })
   quantity: number;

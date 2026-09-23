@@ -683,6 +683,60 @@ export class SalesPointsService {
     }
   }
 
+  async deductStockForSale(
+    salesPointId: string,
+    articleId: string,
+    quantity: number,
+    hasVariants: boolean,
+    articleVariantId?: string | null,
+  ): Promise<void> {
+    const warehouse = await this.getDefaultWarehouse();
+    const warehouseId = warehouse?.id ?? null;
+    if (hasVariants) {
+      if (!articleVariantId) {
+        throw new BadRequestException(
+          'articleVariantId és obligatori per a articles amb variants',
+        );
+      }
+      await this.reduceVariantAtSalesPoint(
+        salesPointId,
+        articleVariantId,
+        quantity,
+        articleId,
+        warehouseId,
+      );
+      return;
+    }
+    await this.reduceStock(salesPointId, articleId, quantity);
+  }
+
+  async restoreStockForSale(
+    salesPointId: string,
+    articleId: string,
+    quantity: number,
+    hasVariants: boolean,
+    articleVariantId?: string | null,
+  ): Promise<void> {
+    const warehouse = await this.getDefaultWarehouse();
+    const warehouseId = warehouse?.id ?? null;
+    if (hasVariants) {
+      if (!articleVariantId) {
+        throw new BadRequestException(
+          'articleVariantId és obligatori per restaurar variants',
+        );
+      }
+      await this.restoreVariantAtSalesPoint(
+        salesPointId,
+        articleVariantId,
+        quantity,
+        articleId,
+        warehouseId,
+      );
+      return;
+    }
+    await this.restoreStock(salesPointId, articleId, quantity);
+  }
+
   async restoreStock(
     salesPointId: string,
     articleId: string,
