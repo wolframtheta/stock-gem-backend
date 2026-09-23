@@ -1,17 +1,14 @@
-import { config } from 'dotenv';
-import { join } from 'path';
 import { DataSource } from 'typeorm';
 import {
   assertDbPassword,
   assertDbUsername,
 } from '../src/config/db-credentials.util';
+import { loadEnvFiles } from '../src/config/load-env-files';
 import { assertSuperadminPassword } from '../src/config/superadmin-password.util';
 import { User } from '../src/modules/auth/entities/user.entity';
 import { seedSuperadminIfNoUsers } from '../src/modules/auth/superadmin-seed';
 
-config({ path: join(__dirname, '../.env') });
-config({ path: join(__dirname, '../.env.local') });
-config({ path: join(__dirname, '../.env.pro') });
+loadEnvFiles();
 
 const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL;
 const SUPERADMIN_NAME = process.env.SUPERADMIN_NAME || 'Super Admin';

@@ -1,8 +1,12 @@
 import { DataSource } from 'typeorm';
-import { config } from 'dotenv';
 import { assertDbPassword, assertDbUsername } from './config/db-credentials.util';
+import { loadEnvForCli } from './config/load-env-files';
+import {
+  typeOrmCliEntityGlobs,
+  typeOrmCliMigrationGlobs,
+} from './config/typeorm-cli-paths';
 
-config();
+loadEnvForCli();
 
 export default new DataSource({
   type: 'postgres',
@@ -11,8 +15,8 @@ export default new DataSource({
   username: assertDbUsername(process.env.DB_USERNAME),
   password: assertDbPassword(process.env.DB_PASSWORD),
   database: process.env.DB_DATABASE || 'stock_gem',
-  entities: ['src/**/*.entity{.ts,.js}'],
-  migrations: ['src/migrations/*{.ts,.js}'],
+  entities: typeOrmCliEntityGlobs(),
+  migrations: typeOrmCliMigrationGlobs(),
   synchronize: false,
   logging: false,
 });
