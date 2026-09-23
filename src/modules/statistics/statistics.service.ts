@@ -178,13 +178,13 @@ export class StatisticsService {
       .innerJoin('si.article', 'a')
       .select('si.article_id', 'articleId')
       .addSelect('a.own_reference', 'articleRef')
-      .addSelect('a.description', 'articleDesc')
+      .addSelect('a.name', 'articleDesc')
       .addSelect('SUM(si.quantity)', 'quantitySold')
       .addSelect('SUM(si.total_price)', 'totalAmount')
       .where('s.sale_date BETWEEN :start AND :end', { start, end })
       .groupBy('si.article_id')
       .addGroupBy('a.own_reference')
-      .addGroupBy('a.description')
+      .addGroupBy('a.name')
       .orderBy('SUM(si.quantity)', 'DESC')
       .getRawMany();
 
@@ -264,12 +264,12 @@ export class StatisticsService {
       .innerJoin('h.article', 'a')
       .select('h.article_id', 'articleId')
       .addSelect('a.own_reference', 'articleRef')
-      .addSelect('a.description', 'articleDesc')
+      .addSelect('a.name', 'articleDesc')
       .addSelect('SUM(h.quantity_added)', 'quantityAdded')
       .where('h.recorded_at BETWEEN :start AND :end', { start, end })
       .groupBy('h.article_id')
       .addGroupBy('a.own_reference')
-      .addGroupBy('a.description')
+      .addGroupBy('a.name')
       .orderBy('SUM(h.quantity_added)', 'DESC')
       .getRawMany();
 

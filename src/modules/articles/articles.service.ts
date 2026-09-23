@@ -735,9 +735,9 @@ export class ArticlesService {
       });
     }
 
-    if (searchDto.description) {
-      queryBuilder.andWhere('article.description ILIKE :description', {
-        description: `%${searchDto.description}%`,
+    if (searchDto.name) {
+      queryBuilder.andWhere('article.name ILIKE :name', {
+        name: `%${searchDto.name}%`,
       });
     }
 
@@ -756,7 +756,7 @@ export class ArticlesService {
     if (searchDto.q && searchDto.q.trim()) {
       const q = `%${searchDto.q.trim()}%`;
       queryBuilder.andWhere(
-        '(article.ownReference ILIKE :q OR article.description ILIKE :q OR collection.name ILIKE :q OR articleType.name ILIKE :q)',
+        '(article.ownReference ILIKE :q OR article.name ILIKE :q OR collection.name ILIKE :q OR articleType.name ILIKE :q)',
         { q },
       );
     }
@@ -783,9 +783,9 @@ export class ArticlesService {
         ownReference: `%${searchDto.ownReference}%`,
       });
     }
-    if (searchDto.description) {
-      qb.andWhere('a.description ILIKE :description', {
-        description: `%${searchDto.description}%`,
+    if (searchDto.name) {
+      qb.andWhere('a.name ILIKE :name', {
+        name: `%${searchDto.name}%`,
       });
     }
     if (searchDto.collectionId) {
@@ -801,7 +801,7 @@ export class ArticlesService {
     if (searchDto.q && searchDto.q.trim()) {
       const q = `%${searchDto.q.trim()}%`;
       qb.andWhere(
-        '(a.own_reference ILIKE :q OR a.description ILIKE :q OR collection.name ILIKE :q OR articleType.name ILIKE :q)',
+        '(a.own_reference ILIKE :q OR a.name ILIKE :q OR collection.name ILIKE :q OR articleType.name ILIKE :q)',
         { q },
       );
     }

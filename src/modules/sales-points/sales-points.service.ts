@@ -465,7 +465,7 @@ export class SalesPointsService {
     {
       articleId: string;
       ownReference: string;
-      description: string;
+      name: string;
       quantityAvailable: number;
       quantityAtDestination: number;
     }[]
@@ -491,7 +491,7 @@ export class SalesPointsService {
       const result: {
         articleId: string;
         ownReference: string;
-        description: string;
+        name: string;
         quantityAvailable: number;
         quantityAtDestination: number;
       }[] = [];
@@ -501,7 +501,7 @@ export class SalesPointsService {
           result.push({
             articleId: a.id,
             ownReference: a.ownReference,
-            description: a.description,
+            name: a.name,
             quantityAvailable: unassigned,
             quantityAtDestination: destMap.get(a.id) ?? 0,
           });
@@ -520,7 +520,7 @@ export class SalesPointsService {
       .map((s) => ({
         articleId: s.articleId,
         ownReference: s.article.ownReference,
-        description: s.article.description,
+        name: s.article.name,
         quantityAvailable: s.quantity,
         quantityAtDestination: destMap.get(s.articleId) ?? 0,
       }))

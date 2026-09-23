@@ -19,7 +19,7 @@ export class Article extends BaseEntity {
   ownReference: string;
 
   @Column({ type: 'text' })
-  description: string;
+  name: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
   cost: number | null;

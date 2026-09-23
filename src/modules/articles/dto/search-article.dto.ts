@@ -7,7 +7,7 @@ export class SearchArticleDto {
 
   @IsString()
   @IsOptional()
-  description?: string;
+  name?: string;
 
   @IsString()
   @IsOptional()
@@ -17,7 +17,7 @@ export class SearchArticleDto {
   @IsOptional()
   articleTypeId?: string;
 
-  /** Cerca lliure: nom, referència, descripció, col·lecció, tipus */
+  /** Cerca lliure: nom, referència, col·lecció, tipus */
   @IsString()
   @IsOptional()
   q?: string;

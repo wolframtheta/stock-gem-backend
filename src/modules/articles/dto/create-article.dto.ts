@@ -24,7 +24,7 @@ export class CreateArticleDto {
 
   @IsString()
   @IsNotEmpty()
-  description: string;
+  name: string;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
