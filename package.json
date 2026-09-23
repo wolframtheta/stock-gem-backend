@@ -33,6 +33,7 @@
     "migration:revert:dist": "node scripts/typeorm-migration-dist.cjs revert",
     "migration:run:dist:pro": "STOCK_GEM_ENV=pro node scripts/typeorm-migration-dist.cjs run",
     "migration:show:dist:pro": "STOCK_GEM_ENV=pro node scripts/typeorm-migration-dist.cjs show",
+    "migration:baseline:dist": "node scripts/migration-baseline.cjs",
     "migration:create": "pnpm typeorm migration:create",
     "seed:superadmin": "ts-node -r tsconfig-paths/register scripts/seed-superadmin.ts"
   },

@@ -75,6 +75,15 @@ node scripts/typeorm-migration-dist.cjs run
 3. Post-deployment command: `node scripts/typeorm-migration-dist.cjs run`
 4. Següents deploys: el post-deploy corre al contenidor **nou** abans de donar-lo per bo.
 
+**BD prod creada amb `DB_SYNCHRONIZE` (taula `migrations` buida):** baseline una vegada al Terminal Coolify abans del post-deploy:
+
+```bash
+node scripts/migration-baseline.cjs --through 1731040000000
+node scripts/typeorm-migration-dist.cjs run
+```
+
+(Si el schema ja inclou feature #14, usa `--all` en lloc de `--through`.)
+
 Variables `DB_*` al servei Coolify (no cal `.env.pro` dins la imatge).
 
 **Build Coolify:** marca `NODE_ENV=production` com a **Runtime only** (no buildtime), o el warning de pnpm/devDeps pot afectar builds sense multi-stage (aquest Dockerfile ja fa build al stage `builder` amb totes les deps).
