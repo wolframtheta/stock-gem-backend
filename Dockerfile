@@ -34,5 +34,7 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-# Coolify Pre-deployment: pnpm run migration:run:dist  (DB_* al servei)
+# Coolify Pre-deployment: NO usar (exec al contenidor VELL, sense migration:run:dist).
+# Coolify Post-deployment: node scripts/typeorm-migration-dist.cjs run
+#   (primer deploy: desactiva post-deploy, desplega, activa post-deploy)
 CMD ["node", "dist/src/main.js"]

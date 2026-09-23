@@ -58,6 +58,25 @@ pnpm migration:run
 pnpm migration:revert
 ```
 
+### Docker / Coolify (prod, sense `src/`)
+
+```bash
+pnpm build   # ja dins la imatge
+pnpm run migration:show:dist
+pnpm run migration:run:dist
+# equivalent sense pnpm:
+node scripts/typeorm-migration-dist.cjs run
+```
+
+**Coolify:** usa **Post-deployment** (no Pre-deployment). El pre-deploy fa `docker exec` al contenidor **encara en execució** (imatge antiga) i falla si el script encara no hi és.
+
+1. Desactiva Pre-deployment.
+2. Desplega una vegada (pull + rebuild sense cache si cal).
+3. Post-deployment command: `node scripts/typeorm-migration-dist.cjs run`
+4. Següents deploys: el post-deploy corre al contenidor **nou** abans de donar-lo per bo.
+
+Variables `DB_*` al servei Coolify (no cal `.env.pro` dins la imatge).
+
 ## Tests
 
 ```bash
