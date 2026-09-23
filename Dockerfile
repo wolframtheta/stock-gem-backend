@@ -28,9 +28,12 @@ RUN pnpm install --frozen-lockfile --prod \
   && apk del .build-deps
 
 COPY --from=builder /app/dist ./dist
+COPY scripts/typeorm-migration-dist.cjs ./scripts/typeorm-migration-dist.cjs
+COPY scripts/docker-entrypoint.sh ./scripts/docker-entrypoint.sh
+RUN chmod +x ./scripts/docker-entrypoint.sh
 
 ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", "dist/src/main.js"]
+ENTRYPOINT ["./scripts/docker-entrypoint.sh"]
