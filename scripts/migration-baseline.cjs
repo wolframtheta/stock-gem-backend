@@ -70,7 +70,8 @@ function parseArgs(argv) {
   node scripts/migration-baseline.cjs --all [--dry-run]
 
 Marca migracions com executades sense correr SQL (BD creada amb synchronize / schema ja existent).
-Després: node scripts/typeorm-migration-dist.cjs run  (només les pendents reals).`);
+Comprova abans que taules/columnes existixen; si no, NO facis baseline — executa migration:run.
+Després: node scripts/typeorm-migration-dist.cjs run  (només les pendents reals; p.ex. RepairBaselinedSchema).`);
     process.exit(1);
   }
   return opts;
