@@ -77,6 +77,8 @@ node scripts/typeorm-migration-dist.cjs run
 
 Variables `DB_*` al servei Coolify (no cal `.env.pro` dins la imatge).
 
+**Build Coolify:** marca `NODE_ENV=production` com a **Runtime only** (no buildtime), o el warning de pnpm/devDeps pot afectar builds sense multi-stage (aquest Dockerfile ja fa build al stage `builder` amb totes les deps).
+
 ## Tests
 
 ```bash
