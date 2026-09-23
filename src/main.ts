@@ -13,11 +13,15 @@ async function bootstrap() {
   app.useStaticAssets(join(uploadDest, 'images'), {
     prefix: '/uploads/images',
   });
-  app.setGlobalPrefix('api');
 
-  // CORS
+  const globalPrefix = configService.get<string>('app.globalPrefix') ?? 'api';
+  if (globalPrefix) {
+    app.setGlobalPrefix(globalPrefix);
+  }
+
+  const corsOrigin = configService.get<string>('app.corsOrigin')!;
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:4200',
+    origin: corsOrigin,
     credentials: true,
   });
 
@@ -34,8 +38,11 @@ async function bootstrap() {
   const reflector = app.get(Reflector);
   app.useGlobalGuards(new JwtAuthGuard(reflector));
 
-  const port = process.env.PORT || 3000;
+  const port = configService.get<number>('app.port') ?? 3000;
   await app.listen(port);
-  console.log(`Application is running on: http://localhost:${port}/api`);
+  const basePath = globalPrefix ? `/${globalPrefix}` : '';
+  console.log(
+    `Application is running on: http://localhost:${port}${basePath} (API_GLOBAL_PREFIX=${globalPrefix || '(none)'})`,
+  );
 }
 bootstrap();

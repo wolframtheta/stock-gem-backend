@@ -86,6 +86,16 @@ node scripts/typeorm-migration-dist.cjs run
 
 Variables `DB_*` al servei Coolify (no cal `.env.pro` dins la imatge).
 
+**URL pública API** (`https://estoc.brucartjoies.com/api/...`):
+
+| Variable | Local | Coolify (path `/api` + strip prefix) |
+|----------|-------|--------------------------------------|
+| `API_GLOBAL_PREFIX` | `api` | buit (no posar `api`) |
+| `CORS_ORIGIN` | `http://localhost:4300` | `https://estoc.brucartjoies.com` |
+| Frontend `NG_APP_API_URL` | `http://localhost:3500/api` | `https://estoc.brucartjoies.com/api` |
+
+Si Coolify **no** fa strip del prefix, posa `API_GLOBAL_PREFIX=api` i assegura que el proxy reenvia el path complet al contenidor.
+
 **Build Coolify:** marca `NODE_ENV=production` com a **Runtime only** (no buildtime), o el warning de pnpm/devDeps pot afectar builds sense multi-stage (aquest Dockerfile ja fa build al stage `builder` amb totes les deps).
 
 ## Tests

@@ -5,12 +5,13 @@ import databaseConfig from './database.config';
 import jwtConfig from './jwt.config';
 import throttleConfig from './throttle.config';
 import uploadConfig from './upload.config';
+import appConfig from './app.config';
 
 @Module({
   imports: [
     NestConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, jwtConfig, throttleConfig, uploadConfig],
+      load: [appConfig, databaseConfig, jwtConfig, throttleConfig, uploadConfig],
       envFilePath: [
         join(process.cwd(), '.env'),
         join(process.cwd(), '.env.local'),
