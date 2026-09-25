@@ -50,24 +50,6 @@ export class FairsService {
     });
     const saved = await this.fairRepository.save(fair);
 
-    const warehouse = await this.salesPointsService.getDefaultWarehouse();
-    if (warehouse) {
-      const warehouseStock = await this.salesPointsService.getStock(
-        warehouse.id,
-      );
-      for (const item of warehouseStock) {
-        if (item.quantity > 0 && item.articleId) {
-          await this.fairStockRepository.save(
-            this.fairStockRepository.create({
-              fairId: saved.id,
-              articleId: item.articleId,
-              quantity: item.quantity,
-            }),
-          );
-        }
-      }
-    }
-
     return this.findOne(saved.id);
   }
 
@@ -321,6 +303,7 @@ export class FairsService {
           item.quantity,
         );
       }
+      await this.salesPointsService.syncArticleStockTotal(item.articleId);
     }
     return results;
   }
@@ -385,11 +368,14 @@ export class FairsService {
       relations: ['articleVariant'],
     });
 
+    const articleIdsToSync = new Set<string>();
+
     for (const row of variantItems) {
       const articleId = row.articleVariant?.articleId;
       if (!articleId) {
         continue;
       }
+      articleIdsToSync.add(articleId);
       await this.salesPointsService.restoreWarehouseVariantFromFair(
         row.articleVariantId,
         row.quantity,
@@ -408,12 +394,17 @@ export class FairsService {
         await this.fairStockRepository.remove(item);
         continue;
       }
+      articleIdsToSync.add(item.articleId);
       await this.salesPointsService.restoreStock(
         warehouse.id,
         item.articleId,
         item.quantity,
       );
       await this.fairStockRepository.remove(item);
+    }
+
+    for (const articleId of articleIdsToSync) {
+      await this.salesPointsService.syncArticleStockTotal(articleId);
     }
 
     return {
@@ -465,6 +456,7 @@ export class FairsService {
           );
         }
         imported++;
+        await this.salesPointsService.syncArticleStockTotal(item.articleId);
         continue;
       }
 
@@ -481,6 +473,7 @@ export class FairsService {
         item.quantity,
       );
       imported++;
+      await this.salesPointsService.syncArticleStockTotal(item.articleId);
     }
 
     return {

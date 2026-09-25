@@ -6,10 +6,12 @@ import { Albaran } from './entities/albaran.entity';
 import { AlbaranItem } from './entities/albaran-item.entity';
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { Article } from '../articles/entities/article.entity';
+import { SalesPointsModule } from '../sales-points/sales-points.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Albaran, AlbaranItem, Supplier, Article]),
+    SalesPointsModule,
   ],
   controllers: [AlbaranesController],
   providers: [AlbaranesService],

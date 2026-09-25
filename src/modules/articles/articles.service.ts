@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { Article } from './entities/article.entity';
@@ -36,6 +37,11 @@ import { Collection } from '../config/entities/collection.entity';
 import { ArticleType } from '../config/entities/article-type.entity';
 import { SalesPointsService } from '../sales-points/sales-points.service';
 import { User, UserRole } from '../auth/entities/user.entity';
+import { totalStockFromLocationSums } from './article-stock-total.util';
+import {
+  toPublicUploadPath,
+  toStoredUploadFilename,
+} from '../../config/upload-path.util';
 
 export type ArticleVariantResponse = {
   id: string;
@@ -110,7 +116,24 @@ export class ArticlesService {
     @InjectRepository(ArticleType)
     private articleTypeRepository: Repository<ArticleType>,
     private salesPointsService: SalesPointsService,
+    private configService: ConfigService,
   ) {}
+
+  private normalizeStoredUpload(value: string): string {
+    try {
+      return toStoredUploadFilename(value);
+    } catch {
+      throw new BadRequestException('Path de foto no vàlid');
+    }
+  }
+
+  private expandUploadForResponse(stored: string | null): string | null {
+    if (!stored) {
+      return null;
+    }
+    const publicPath = this.configService.get<string>('upload.publicPath')!;
+    return toPublicUploadPath(stored, publicPath);
+  }
 
   async create(createArticleDto: CreateArticleDto): Promise<ArticleWithFairQty> {
     const hasVariants = createArticleDto.hasVariants ?? false;
@@ -158,12 +181,15 @@ export class ArticlesService {
 
     const { photoPaths, photo, variants, hasVariants: _hv, ...articleData } =
       createArticleDto;
-    const primaryPhoto = photoPaths?.[0] ?? photo ?? null;
+    const primaryPhotoRaw = photoPaths?.[0] ?? photo ?? null;
+    const primaryPhoto = primaryPhotoRaw
+      ? this.normalizeStoredUpload(primaryPhotoRaw)
+      : null;
 
     const article = this.articleRepository.create({
       ...articleData,
       cost: createArticleDto.cost ?? null,
-      stock: hasVariants ? 0 : (createArticleDto.stock ?? 0),
+      stock: 0,
       hasVariants,
       photo: primaryPhoto,
       collection: collection || null,
@@ -190,16 +216,20 @@ export class ArticlesService {
 
     if (hasVariants) {
       await this.syncArticleVariants(saved.id, variants!);
-    } else if (saved.stock > 0) {
+    } else if ((createArticleDto.stock ?? 0) > 0) {
       const warehouse = await this.salesPointsService.getDefaultWarehouse();
       if (warehouse) {
-        const currentAtWarehouse =
-          await this.salesPointsService.getStockAtPoint(warehouse.id, saved.id);
         await this.salesPointsService.assignStock(warehouse.id, {
           articleId: saved.id,
-          quantity: currentAtWarehouse + saved.stock,
+          quantity: createArticleDto.stock ?? 0,
         });
+      } else {
+        throw new BadRequestException(
+          'Cal magatzem per defecte per crear un article amb stock',
+        );
       }
+    } else {
+      await this.salesPointsService.syncArticleStockTotal(saved.id);
     }
 
     return this.findOne(saved.id);
@@ -290,6 +320,13 @@ export class ArticlesService {
 
   private enrichArticleResponse(article: Article): ArticleWithFairQty {
     const result = { ...article } as unknown as ArticleWithFairQty;
+    result.photo = this.expandUploadForResponse(article.photo);
+    if (article.photos?.length) {
+      result.photos = article.photos.map((p) => ({
+        ...p,
+        path: this.expandUploadForResponse(p.path)!,
+      }));
+    }
     if (!article.hasVariants) {
       result.variants = [];
       return result;
@@ -317,7 +354,7 @@ export class ArticlesService {
     const rows = paths.map((path, index) =>
       this.articlePhotoRepository.create({
         articleId,
-        path,
+        path: this.normalizeStoredUpload(path),
         sortOrder: index,
       }),
     );
@@ -353,11 +390,6 @@ export class ArticlesService {
 
   private async assertCanActivateHasVariants(articleId: string): Promise<void> {
     const breakdown = await this.getStockBreakdown(articleId);
-    if (breakdown.unassigned > 0) {
-      throw new ConflictException(
-        'No es pot activar variants: hi ha stock no assignat. Assigna tot al magatzem abans.',
-      );
-    }
     if (breakdown.byFair.some((f) => f.quantity > 0)) {
       throw new ConflictException(
         'No es pot activar variants amb stock assignat a fires',
@@ -448,7 +480,7 @@ export class ArticlesService {
     articleId: string,
     variantsInput: ArticleVariantInputDto[],
   ): Promise<number> {
-    return this.articleRepository.manager.transaction(async (em) => {
+    await this.articleRepository.manager.transaction(async (em) => {
       await em.findOne(Article, {
         where: { id: articleId },
         lock: { mode: 'pessimistic_write' },
@@ -523,20 +555,16 @@ export class ArticlesService {
         await variantRepo.delete({ id: old.id });
       }
 
-      const total = sumWarehouseQuantities(
+      const warehouseTotal = sumWarehouseQuantities(
         normalized.map((s) => ({ warehouseQuantity: s.warehouseQuantity })),
       );
 
-      await em.update(
-        Article,
-        { id: articleId },
-        { stock: total, hasVariants: true },
-      );
+      await em.update(Article, { id: articleId }, { hasVariants: true });
 
-      await this.syncWarehouseStockForVariants(em, articleId, total);
-
-      return total;
+      await this.syncWarehouseStockForVariants(em, articleId, warehouseTotal);
     });
+
+    return this.salesPointsService.syncArticleStockTotal(articleId);
   }
 
   async update(
@@ -616,10 +644,12 @@ export class ArticlesService {
       updateArticleDto;
 
     if (photoPaths !== undefined) {
-      article.photo = photoPaths[0] ?? null;
+      article.photo = photoPaths[0]
+        ? this.normalizeStoredUpload(photoPaths[0])
+        : null;
       await this.syncArticlePhotos(id, photoPaths);
     } else if (photo !== undefined) {
-      article.photo = photo ?? null;
+      article.photo = photo ? this.normalizeStoredUpload(photo) : null;
       if (photo) {
         await this.syncArticlePhotos(id, [photo]);
       } else {
@@ -655,20 +685,32 @@ export class ArticlesService {
     } else if (article.hasVariants && variants !== undefined) {
       article.stock = await this.syncArticleVariants(id, variants);
     } else if (!article.hasVariants && stock !== undefined) {
-      article.stock = Number(stock);
+      // TOT-01: el total es deriva de les ubicacions després de guardar el magatzem.
+    }
+
+    const saved = await this.articleRepository.save(article);
+
+    if (!saved.hasVariants && stock !== undefined) {
       const warehouse = await this.salesPointsService.getDefaultWarehouse();
       if (warehouse) {
         const assignedElsewhere =
           (await this.getAssignedOutsideWarehouse(id, warehouse.id)) ?? 0;
-        const newWarehouseQty = Math.max(0, article.stock - assignedElsewhere);
+        const newWarehouseQty = Math.max(0, Number(stock) - assignedElsewhere);
         await this.salesPointsService.assignStock(warehouse.id, {
           articleId: id,
           quantity: newWarehouseQty,
         });
+      } else {
+        throw new BadRequestException(
+          'Cal magatzem per defecte per actualitzar el stock',
+        );
       }
+    } else if (
+      saved.hasVariants &&
+      (variants !== undefined || turningOn)
+    ) {
+      await this.salesPointsService.syncArticleStockTotal(id);
     }
-
-    const saved = await this.articleRepository.save(article);
 
     if (
       updateArticleDto.pvp !== undefined &&
@@ -822,13 +864,32 @@ export class ArticlesService {
     }
     assertHasVariantsBlocked(article.hasVariants);
 
-    article.stock = article.stock + quantity;
+    const warehouse = await this.salesPointsService.getDefaultWarehouse();
+    if (!warehouse) {
+      throw new BadRequestException('No hi ha magatzem configurat');
+    }
 
-    if (article.stock < 0) {
+    if (quantity > 0) {
+      await this.salesPointsService.restoreStock(
+        warehouse.id,
+        article.id,
+        quantity,
+      );
+    } else if (quantity < 0) {
+      await this.salesPointsService.reduceStock(
+        warehouse.id,
+        article.id,
+        -quantity,
+      );
+    }
+
+    const total = await this.salesPointsService.syncArticleStockTotal(
+      article.id,
+    );
+    if (total < 0) {
       throw new ConflictException('El stock no puede ser negativo');
     }
 
-    await this.articleRepository.save(article);
     return this.findOne(id);
   }
 
@@ -993,14 +1054,19 @@ export class ArticlesService {
 
     const variantMatrix = await this.buildVariantStockMatrix(id, stockByPoint);
 
+    const total = totalStockFromLocationSums(
+      assignedToPoints,
+      assignedToFairs,
+    );
+    if (article.stock !== total) {
+      await this.salesPointsService.syncArticleStockTotal(id);
+    }
+
     return {
-      total: article.stock,
+      total,
       bySalesPoint,
       byFair,
-      unassigned: Math.max(
-        0,
-        article.stock - assignedToPoints - assignedToFairs,
-      ),
+      unassigned: 0,
       variantMatrix,
     };
   }
@@ -1034,7 +1100,6 @@ export class ArticlesService {
       }),
     );
 
-    article.stock += qty;
     article.cost = dto.cost;
     article.pvp = dto.pvp;
     await this.articleRepository.save(article);
@@ -1059,6 +1124,8 @@ export class ArticlesService {
         articleId: id,
         quantity: currentAtWarehouse + qty,
       });
+    } else {
+      throw new BadRequestException('No hi ha magatzem configurat');
     }
 
     return this.findOne(id);
@@ -1087,7 +1154,7 @@ export class ArticlesService {
         relations: ['variantStock'],
       });
 
-      let newTotal = 0;
+      let warehouseVariantSum = 0;
       for (const size of sizes) {
         const delta = addByVariantId.get(size.id) ?? 0;
         let variantStock = size.variantStock;
@@ -1100,14 +1167,8 @@ export class ArticlesService {
           variantStock.quantity += delta;
         }
         await stockRepo.save(variantStock);
-        newTotal += variantStock.quantity;
+        warehouseVariantSum += variantStock.quantity;
       }
-
-      await em.update(
-        Article,
-        { id: article.id },
-        { stock: newTotal, cost: dto.cost, pvp: dto.pvp },
-      );
 
       await em.save(
         em.create(ArticleStockHistory, {
@@ -1117,8 +1178,20 @@ export class ArticlesService {
         }),
       );
 
-      await this.syncWarehouseStockForVariants(em, article.id, newTotal);
+      await em.update(
+        Article,
+        { id: article.id },
+        { cost: dto.cost, pvp: dto.pvp },
+      );
+
+      await this.syncWarehouseStockForVariants(
+        em,
+        article.id,
+        warehouseVariantSum,
+      );
     });
+
+    await this.salesPointsService.syncArticleStockTotal(article.id);
 
     if (shouldRecordPriceHistory(oldPvp, dto.pvp)) {
       await this.priceHistoryRepository.save(

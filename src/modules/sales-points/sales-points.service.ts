@@ -24,6 +24,7 @@ import {
   MoveStockVariantLine,
   normalizeMoveVariantLines,
 } from './stock-move-variants.util';
+import { totalStockFromLocationSums } from '../articles/article-stock-total.util';
 
 export interface StockVariantLineView {
   articleVariantId: string;
@@ -159,8 +160,7 @@ export class SalesPointsService {
       if (!warehouse) {
         maxQuantity = item.quantity;
       } else if (isWarehouse) {
-        const unassigned = await this.getUnassignedStock(item.articleId);
-        maxQuantity = item.quantity + unassigned;
+        maxQuantity = item.quantity;
       } else {
         const warehouseStock = await this.getStockAtPoint(
           warehouse.id,
@@ -458,7 +458,54 @@ export class SalesPointsService {
   }
 
   async getAvailableStock(articleId: string): Promise<number> {
-    return this.getUnassignedStock(articleId);
+    const { total } = await this.sumStockAtAllLocations(articleId);
+    return total;
+  }
+
+  async sumStockAtAllLocations(articleId: string): Promise<{
+    assignedToSalesPoints: number;
+    assignedToFairs: number;
+    total: number;
+  }> {
+    const [salesPointsResult, fairStockResult] = await Promise.all([
+      this.stockRepository
+        .createQueryBuilder('sps')
+        .select('COALESCE(SUM(sps.quantity), 0)', 'total')
+        .where('sps.article_id = :articleId', { articleId })
+        .getRawOne(),
+      this.fairStockRepository
+        .createQueryBuilder('fs')
+        .select('COALESCE(SUM(fs.quantity), 0)', 'total')
+        .where('fs.article_id = :articleId', { articleId })
+        .getRawOne(),
+    ]);
+
+    const assignedToSalesPoints = parseInt(salesPointsResult?.total || '0', 10);
+    const assignedToFairs = parseInt(fairStockResult?.total || '0', 10);
+    return {
+      assignedToSalesPoints,
+      assignedToFairs,
+      total: totalStockFromLocationSums(
+        assignedToSalesPoints,
+        assignedToFairs,
+      ),
+    };
+  }
+
+  async syncArticleStockTotal(articleId: string): Promise<number> {
+    const article = await this.articleRepository.findOne({
+      where: { id: articleId },
+    });
+    if (!article) {
+      throw new NotFoundException(`Artículo con ID ${articleId} no encontrado`);
+    }
+
+    const { total } = await this.sumStockAtAllLocations(articleId);
+    if (article.stock !== total) {
+      article.stock = total;
+      await this.articleRepository.save(article);
+    }
+    return total;
   }
 
   async getAvailableForAddStock(destinationId: string): Promise<
@@ -477,37 +524,7 @@ export class SalesPointsService {
     const isWarehouse = destinationId === warehouse.id;
 
     if (isWarehouse) {
-      const warehouseStock = await this.stockRepository.find({
-        where: { salesPointId: warehouse.id },
-        relations: ['article'],
-      });
-      const destMap = new Map(
-        warehouseStock.map((s) => [s.articleId, s.quantity]),
-      );
-      const articles = await this.articleRepository.find({
-        where: {},
-        order: { ownReference: 'ASC' },
-      });
-      const result: {
-        articleId: string;
-        ownReference: string;
-        name: string;
-        quantityAvailable: number;
-        quantityAtDestination: number;
-      }[] = [];
-      for (const a of articles) {
-        const unassigned = await this.getUnassignedStock(a.id);
-        if (unassigned > 0) {
-          result.push({
-            articleId: a.id,
-            ownReference: a.ownReference,
-            name: a.name,
-            quantityAvailable: unassigned,
-            quantityAtDestination: destMap.get(a.id) ?? 0,
-          });
-        }
-      }
-      return result;
+      return [];
     }
 
     const [warehouseStock, destStock] = await Promise.all([
@@ -527,31 +544,9 @@ export class SalesPointsService {
       .sort((x, y) => x.ownReference.localeCompare(y.ownReference));
   }
 
-  private async getUnassignedStock(articleId: string): Promise<number> {
-    const article = await this.articleRepository.findOne({
-      where: { id: articleId },
-    });
-    if (!article) {
-      throw new NotFoundException(`Artículo con ID ${articleId} no encontrado`);
-    }
-
-    const [salesPointsResult, fairStockResult] = await Promise.all([
-      this.stockRepository
-        .createQueryBuilder('sps')
-        .select('COALESCE(SUM(sps.quantity), 0)', 'total')
-        .where('sps.article_id = :articleId', { articleId })
-        .getRawOne(),
-      this.fairStockRepository
-        .createQueryBuilder('fs')
-        .select('COALESCE(SUM(fs.quantity), 0)', 'total')
-        .where('fs.article_id = :articleId', { articleId })
-        .getRawOne(),
-    ]);
-
-    const assignedToPoints = parseInt(salesPointsResult?.total || '0', 10);
-    const assignedToFairs = parseInt(fairStockResult?.total || '0', 10);
-    const assigned = assignedToPoints + assignedToFairs;
-    return Math.max(0, article.stock - assigned);
+  /** @deprecated TOT-01: no hi ha stock «sense assignar»; usar sumStockAtAllLocations. */
+  private async getUnassignedStock(_articleId: string): Promise<number> {
+    return 0;
   }
 
   async assignStock(
@@ -588,9 +583,12 @@ export class SalesPointsService {
         existing.quantity = dto.quantity;
         if (dto.quantity === 0) {
           await this.stockRepository.remove(existing);
+          await this.syncArticleStockTotal(dto.articleId);
           return existing;
         }
-        return this.stockRepository.save(existing);
+        const savedDecrease = await this.stockRepository.save(existing);
+        await this.syncArticleStockTotal(dto.articleId);
+        return savedDecrease;
       }
       if (dto.quantity === 0) {
         const empty = this.stockRepository.create({
@@ -602,33 +600,32 @@ export class SalesPointsService {
       }
     }
 
-    const available = isWarehouse
-      ? await this.getUnassignedStock(dto.articleId)
-      : warehouse
-        ? await this.getStockAtPoint(warehouse.id, dto.articleId)
-        : 0;
-
-    if (delta > available) {
-      throw new BadRequestException(
-        `Stock insuficient. Disponible al magatzem: ${available}, sol·licitat: ${delta} (actual al punt: ${currentAtPoint})`,
-      );
-    }
-
     if (!isWarehouse && warehouse && delta > 0) {
+      const available = await this.getStockAtPoint(warehouse.id, dto.articleId);
+      if (delta > available) {
+        throw new BadRequestException(
+          `Stock insuficient. Disponible al magatzem: ${available}, sol·licitat: ${delta} (actual al punt: ${currentAtPoint})`,
+        );
+      }
       await this.reduceStock(warehouse.id, dto.articleId, delta);
     }
 
+    let saved: SalesPointStock;
     if (existing) {
       existing.quantity = dto.quantity;
-      return this.stockRepository.save(existing);
+      saved = await this.stockRepository.save(existing);
+    } else {
+      saved = await this.stockRepository.save(
+        this.stockRepository.create({
+          salesPointId,
+          articleId: dto.articleId,
+          quantity: dto.quantity,
+        }),
+      );
     }
 
-    const stock = this.stockRepository.create({
-      salesPointId,
-      articleId: dto.articleId,
-      quantity: dto.quantity,
-    });
-    return this.stockRepository.save(stock);
+    await this.syncArticleStockTotal(dto.articleId);
+    return saved;
   }
 
   async assignStockBatch(
@@ -792,7 +789,9 @@ export class SalesPointsService {
       const toRestore = currentQty - newQuantity;
       await this.restoreStock(warehouse.id, articleId, toRestore);
       sps.quantity = newQuantity;
-      return this.stockRepository.save(sps);
+      const saved = await this.stockRepository.save(sps);
+      await this.syncArticleStockTotal(articleId);
+      return saved;
     }
 
     const warehouseStock = await this.getStockAtPoint(warehouse.id, articleId);
@@ -805,7 +804,9 @@ export class SalesPointsService {
 
     await this.reduceStock(warehouse.id, articleId, delta);
     sps.quantity = newQuantity;
-    return this.stockRepository.save(sps);
+    const saved = await this.stockRepository.save(sps);
+    await this.syncArticleStockTotal(articleId);
+    return saved;
   }
 
   async removeFromPoint(
@@ -826,6 +827,7 @@ export class SalesPointsService {
 
     await this.restoreStock(warehouse.id, articleId, sps.quantity);
     await this.stockRepository.remove(sps);
+    await this.syncArticleStockTotal(articleId);
   }
 
   async moveStock(
@@ -933,6 +935,8 @@ export class SalesPointsService {
       } else {
         await this.restoreStock(toId, item.articleId, item.quantity!);
       }
+
+      await this.syncArticleStockTotal(item.articleId);
     }
   }
 }

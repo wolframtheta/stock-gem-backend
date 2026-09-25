@@ -2,9 +2,10 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Albaran } from './entities/albaran.entity';
 import { AlbaranItem } from './entities/albaran-item.entity';
 import { CreateAlbaranDto } from './dto/create-albaran.dto';
@@ -12,6 +13,7 @@ import { UpdateAlbaranDto } from './dto/update-albaran.dto';
 import { SearchAlbaranDto } from './dto/search-albaran.dto';
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { Article } from '../articles/entities/article.entity';
+import { SalesPointsService } from '../sales-points/sales-points.service';
 
 @Injectable()
 export class AlbaranesService {
@@ -24,10 +26,42 @@ export class AlbaranesService {
     private supplierRepository: Repository<Supplier>,
     @InjectRepository(Article)
     private articleRepository: Repository<Article>,
+    private salesPointsService: SalesPointsService,
   ) {}
 
+  private async addInboundToWarehouse(
+    articleId: string,
+    quantity: number,
+  ): Promise<void> {
+    const warehouse = await this.salesPointsService.getDefaultWarehouse();
+    if (!warehouse) {
+      throw new BadRequestException('No hi ha magatzem configurat');
+    }
+    await this.salesPointsService.restoreStock(
+      warehouse.id,
+      articleId,
+      quantity,
+    );
+    await this.salesPointsService.syncArticleStockTotal(articleId);
+  }
+
+  private async removeInboundFromWarehouse(
+    articleId: string,
+    quantity: number,
+  ): Promise<void> {
+    const warehouse = await this.salesPointsService.getDefaultWarehouse();
+    if (!warehouse) {
+      throw new BadRequestException('No hi ha magatzem configurat');
+    }
+    await this.salesPointsService.reduceStock(
+      warehouse.id,
+      articleId,
+      quantity,
+    );
+    await this.salesPointsService.syncArticleStockTotal(articleId);
+  }
+
   async create(createAlbaranDto: CreateAlbaranDto): Promise<Albaran> {
-    // Verificar que el número de albarán no existe
     const existingAlbaran = await this.albaranRepository.findOne({
       where: { albaranNumber: createAlbaranDto.albaranNumber },
     });
@@ -38,7 +72,6 @@ export class AlbaranesService {
       );
     }
 
-    // Verificar proveedor
     const supplier = await this.supplierRepository.findOne({
       where: { id: createAlbaranDto.supplierId },
     });
@@ -49,7 +82,6 @@ export class AlbaranesService {
       );
     }
 
-    // Verificar artículos
     for (const itemDto of createAlbaranDto.items) {
       const article = await this.articleRepository.findOne({
         where: { id: itemDto.articleId },
@@ -67,7 +99,6 @@ export class AlbaranesService {
       }
     }
 
-    // Crear el albarán
     const albaran = this.albaranRepository.create({
       albaranNumber: createAlbaranDto.albaranNumber,
       supplier: supplier,
@@ -77,7 +108,6 @@ export class AlbaranesService {
 
     const savedAlbaran = await this.albaranRepository.save(albaran);
 
-    // Crear los items y actualizar stock
     const items: AlbaranItem[] = [];
     for (const itemDto of createAlbaranDto.items) {
       const article = await this.articleRepository.findOne({
@@ -97,12 +127,9 @@ export class AlbaranesService {
       const savedItem = await this.albaranItemRepository.save(albaranItem);
       items.push(savedItem);
 
-      // Aumentar stock
-      article!.stock += itemDto.quantity;
-      await this.articleRepository.save(article!);
+      await this.addInboundToWarehouse(itemDto.articleId, itemDto.quantity);
     }
 
-    // Cargar el albarán con relaciones
     return this.albaranRepository.findOne({
       where: { id: savedAlbaran.id },
       relations: ['supplier', 'items', 'items.article'],
@@ -188,7 +215,6 @@ export class AlbaranesService {
   ): Promise<Albaran> {
     const albaran = await this.findOne(id);
 
-    // Verificar número único si se actualiza
     if (
       updateAlbaranDto.albaranNumber &&
       updateAlbaranDto.albaranNumber !== albaran.albaranNumber
@@ -204,7 +230,6 @@ export class AlbaranesService {
       }
     }
 
-    // Actualizar proveedor si se proporciona
     if (updateAlbaranDto.supplierId !== undefined) {
       const supplier = await this.supplierRepository.findOne({
         where: { id: updateAlbaranDto.supplierId },
@@ -219,7 +244,6 @@ export class AlbaranesService {
       albaran.supplier = supplier;
     }
 
-    // Actualizar otros campos
     Object.assign(albaran, {
       albaranNumber: updateAlbaranDto.albaranNumber ?? albaran.albaranNumber,
       date: updateAlbaranDto.date
@@ -228,23 +252,15 @@ export class AlbaranesService {
       condition: updateAlbaranDto.condition ?? albaran.condition,
     });
 
-    // Si se proporcionan items, actualizarlos
     if (updateAlbaranDto.items) {
-      // Eliminar items existentes y restaurar stock
       for (const existingItem of albaran.items) {
-        const article = await this.articleRepository.findOne({
-          where: { id: existingItem.articleId },
-        });
-
-        if (article) {
-          article.stock -= existingItem.quantity;
-          await this.articleRepository.save(article);
-        }
-
+        await this.removeInboundFromWarehouse(
+          existingItem.articleId,
+          existingItem.quantity,
+        );
         await this.albaranItemRepository.remove(existingItem);
       }
 
-      // Crear nuevos items y actualizar stock
       const items: AlbaranItem[] = [];
       for (const itemDto of updateAlbaranDto.items) {
         const article = await this.articleRepository.findOne({
@@ -275,9 +291,7 @@ export class AlbaranesService {
         const savedItem = await this.albaranItemRepository.save(albaranItem);
         items.push(savedItem);
 
-        // Aumentar stock
-        article.stock += itemDto.quantity;
-        await this.articleRepository.save(article);
+        await this.addInboundToWarehouse(itemDto.articleId, itemDto.quantity);
       }
 
       albaran.items = items;
@@ -289,16 +303,8 @@ export class AlbaranesService {
   async remove(id: string): Promise<void> {
     const albaran = await this.findOne(id);
 
-    // Restaurar stock de los artículos
     for (const item of albaran.items) {
-      const article = await this.articleRepository.findOne({
-        where: { id: item.articleId },
-      });
-
-      if (article) {
-        article.stock -= item.quantity;
-        await this.articleRepository.save(article);
-      }
+      await this.removeInboundFromWarehouse(item.articleId, item.quantity);
     }
 
     await this.albaranRepository.remove(albaran);

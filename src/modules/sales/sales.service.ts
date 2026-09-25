@@ -155,8 +155,7 @@ export class SalesService {
         itemDto.articleVariantId,
       );
 
-      article!.stock -= itemDto.quantity;
-      await this.articleRepository.save(article!);
+      await this.salesPointsService.syncArticleStockTotal(itemDto.articleId);
     }
 
     return this.saleRepository.findOne({
@@ -296,8 +295,7 @@ export class SalesService {
       );
     }
 
-    article.stock += item.quantity;
-    await this.articleRepository.save(article);
+    await this.salesPointsService.syncArticleStockTotal(item.articleId);
   }
 
   async findAll(): Promise<Sale[]> {
