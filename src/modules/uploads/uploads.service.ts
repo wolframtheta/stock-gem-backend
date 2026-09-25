@@ -14,8 +14,7 @@ export class UploadsService {
   constructor(private readonly configService: ConfigService) {}
 
   getImagesDirectory(): string {
-    const dest = this.configService.get<string>('upload.dest')!;
-    const imagesDir = join(dest, 'images');
+    const imagesDir = this.configService.get<string>('upload.dest')!;
     mkdirSync(imagesDir, { recursive: true });
     return imagesDir;
   }
@@ -24,11 +23,7 @@ export class UploadsService {
     return this.configService.get<number>('upload.maxFileSizeBytes')!;
   }
 
-  buildPublicPath(filename: string): string {
-    return `/uploads/images/${filename}`;
-  }
-
-  saveUploadedImage(file: UploadedImageFile): { path: string } {
+  saveUploadedImage(file: UploadedImageFile): { filename: string } {
     if (!file) {
       throw new BadRequestException('No s\'ha rebut cap fitxer');
     }
@@ -50,6 +45,6 @@ export class UploadsService {
     const imagesDir = this.getImagesDirectory();
     writeFileSync(join(imagesDir, filename), file.buffer);
 
-    return { path: this.buildPublicPath(filename) };
+    return { filename };
   }
 }

@@ -31,7 +31,7 @@ JWT_EXPIRES_IN=24h
 
 # File Upload
 MAX_FILE_SIZE=5242880
-UPLOAD_DEST=./uploads
+UPLOAD_DEST=data/images
 ```
 
 ## Executar l'aplicació
@@ -93,6 +93,13 @@ Variables `DB_*` al servei Coolify (no cal `.env.pro` dins la imatge).
 | `API_GLOBAL_PREFIX` | `api` | buit (no posar `api`) |
 | `CORS_ORIGIN` | `http://localhost:4300` | `https://estoc.brucartjoies.com` |
 | Frontend `NG_APP_API_URL` | `http://localhost:3500/api` | `https://estoc.brucartjoies.com/api` |
+| `UPLOAD_DEST` | `data/images` | `/data/images` (mateix path que el volum) |
+| `UPLOAD_PUBLIC_PATH` | `/uploads/images` | mateix (ha de coincidir amb `NG_APP_UPLOAD_PUBLIC_PATH`) |
+| Frontend `NG_APP_UPLOAD_PUBLIC_PATH` | `/uploads/images` | mateix que backend |
+
+**Volum imatges (Coolify):** Storage → nou volum → **Destination Path** `/data/images`. Env `UPLOAD_DEST=/data/images`. Sense volum, les imatges es perden en cada redeploy.
+
+`UPLOAD_PUBLIC_PATH` controla el prefix HTTP (static GET, resposta API en llegir articles). A BD es guarda **només el nom del fitxer** (`uuid.jpg`); el POST d’upload retorna `{ filename }`.
 
 Si Coolify **no** fa strip del prefix, posa `API_GLOBAL_PREFIX=api` i assegura que el proxy reenvia el path complet al contenidor.
 

@@ -15,7 +15,9 @@ import appConfig from './app.config';
       envFilePath: [
         join(process.cwd(), '.env'),
         join(process.cwd(), '.env.local'),
-        join(process.cwd(), '.env.pro'),
+        ...(process.env.STOCK_GEM_ENV === 'pro'
+          ? [join(process.cwd(), '.env.pro')]
+          : []),
       ],
     }),
   ],

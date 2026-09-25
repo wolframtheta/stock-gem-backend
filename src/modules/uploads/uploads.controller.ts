@@ -11,13 +11,15 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../auth/entities/user.entity';
 import { UploadsService } from './uploads.service';
-@Controller('uploads')
+import { uploadNestControllerPath } from '../../config/upload-path.util';
+
+@Controller(uploadNestControllerPath())
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
-  @Post('images')
+  @Post()
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 5 * 1024 * 1024 },

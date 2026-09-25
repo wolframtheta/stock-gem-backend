@@ -1,8 +1,8 @@
+import './load-env';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
-import { join } from 'path';
 import { AppModule } from './app.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 
@@ -10,8 +10,9 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const configService = app.get(ConfigService);
   const uploadDest = configService.get<string>('upload.dest')!;
-  app.useStaticAssets(join(uploadDest, 'images'), {
-    prefix: '/uploads/images',
+  const uploadPublicPath = configService.get<string>('upload.publicPath')!;
+  app.useStaticAssets(uploadDest, {
+    prefix: uploadPublicPath,
   });
 
   const globalPrefix = configService.get<string>('app.globalPrefix') ?? 'api';
