@@ -95,7 +95,8 @@ Variables `DB_*` al servei Coolify (no cal `.env.pro` dins la imatge).
 | Frontend `NG_APP_API_URL` | `http://localhost:3500/api` | `https://estoc.brucartjoies.com/api` |
 | `UPLOAD_DEST` | `data/images` | `/data/images` (mateix path que el volum) |
 | `UPLOAD_PUBLIC_PATH` | `/uploads/images` | mateix (ha de coincidir amb `NG_APP_UPLOAD_PUBLIC_PATH`) |
-| Frontend `NG_APP_UPLOAD_PUBLIC_PATH` | `/uploads/images` | mateix que backend |
+| Frontend `NG_APP_UPLOAD_PUBLIC_PATH` | `/uploads/images` | mateix que backend (path del POST upload) |
+| Frontend `NG_APP_ASSET_PUBLIC_BASE_URL` | (opcional) | URL completa per `<img>` (GET), p.ex. `https://estoc…/media/images` si el proxy separa `/api` i `/media` |
 
 **Volum imatges (Coolify):** Storage → nou volum → **Destination Path** `/data/images`. Env `UPLOAD_DEST=/data/images`. Sense volum, les imatges es perden en cada redeploy.
 
