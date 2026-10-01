@@ -513,6 +513,7 @@ export class SalesPointsService {
       articleId: string;
       ownReference: string;
       name: string;
+      photo: string | null;
       quantityAvailable: number;
       quantityAtDestination: number;
     }[]
@@ -538,6 +539,7 @@ export class SalesPointsService {
         articleId: s.articleId,
         ownReference: s.article.ownReference,
         name: s.article.name,
+        photo: s.article.photo ?? null,
         quantityAvailable: s.quantity,
         quantityAtDestination: destMap.get(s.articleId) ?? 0,
       }))
