@@ -1,25 +1,15 @@
 import { Entity, Column, Index, ManyToOne, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../../common/entities/base.entity';
 import { Client } from '../../clients/entities/client.entity';
-import { Workshop } from '../../workshops/entities/workshop.entity';
 import { PersonalizationType } from '../../config/entities/personalization-type.entity';
 
 @Entity('personalizations')
-@Index('idx_personalizations_code', ['code'])
 @Index('idx_personalizations_client_id', ['client'])
-@Index('idx_personalizations_workshop_id', ['workshop'])
 @Index('idx_personalizations_entry_date', ['entryDate'])
 export class Personalization extends BaseEntity {
-  @Column({ type: 'varchar', length: 50, unique: true })
-  code: string;
-
-  @ManyToOne(() => Client, { nullable: false, onDelete: 'RESTRICT' })
+  @ManyToOne(() => Client, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'client_id' })
-  client: Client;
-
-  @ManyToOne(() => Workshop, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'workshop_id' })
-  workshop: Workshop | null;
+  client: Client | null;
 
   @ManyToOne(() => PersonalizationType, {
     nullable: true,

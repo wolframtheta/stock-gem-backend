@@ -10,18 +10,9 @@ import {
 } from 'class-validator';
 
 export class CreatePersonalizationDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(50)
-  code: string;
-
-  @IsUUID()
-  @IsNotEmpty()
-  clientId: string;
-
   @IsUUID()
   @IsOptional()
-  workshopId?: string;
+  clientId?: string;
 
   @IsUUID()
   @IsOptional()

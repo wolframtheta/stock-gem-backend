@@ -11,7 +11,6 @@ import { CreatePersonalizationDto } from './dto/create-personalization.dto';
 import { UpdatePersonalizationDto } from './dto/update-personalization.dto';
 import { SearchPersonalizationDto } from './dto/search-personalization.dto';
 import { Client } from '../clients/entities/client.entity';
-import { Workshop } from '../workshops/entities/workshop.entity';
 import { PersonalizationType } from '../config/entities/personalization-type.entity';
 
 @Injectable()
@@ -21,8 +20,6 @@ export class PersonalizationsService {
     private personalizationRepository: Repository<Personalization>,
     @InjectRepository(Client)
     private clientRepository: Repository<Client>,
-    @InjectRepository(Workshop)
-    private workshopRepository: Repository<Workshop>,
     @InjectRepository(PersonalizationType)
     private personalizationTypeRepository: Repository<PersonalizationType>,
   ) {}
@@ -30,35 +27,15 @@ export class PersonalizationsService {
   async create(
     createPersonalizationDto: CreatePersonalizationDto,
   ): Promise<Personalization> {
-    const existing = await this.personalizationRepository.findOne({
-      where: { code: createPersonalizationDto.code },
-    });
-
-    if (existing) {
-      throw new ConflictException(
-        `Ja existe una personalització amb el codi ${createPersonalizationDto.code}`,
-      );
-    }
-
-    const client = await this.clientRepository.findOne({
-      where: { id: createPersonalizationDto.clientId },
-    });
-
-    if (!client) {
-      throw new NotFoundException(
-        `Client amb ID ${createPersonalizationDto.clientId} no trobat`,
-      );
-    }
-
-    let workshop: Workshop | null = null;
-    if (createPersonalizationDto.workshopId) {
-      workshop = await this.workshopRepository.findOne({
-        where: { id: createPersonalizationDto.workshopId },
+    let client: Client | null = null;
+    if (createPersonalizationDto.clientId) {
+      client = await this.clientRepository.findOne({
+        where: { id: createPersonalizationDto.clientId },
       });
 
-      if (!workshop) {
+      if (!client) {
         throw new NotFoundException(
-          `Taller amb ID ${createPersonalizationDto.workshopId} no trobat`,
+          `Client amb ID ${createPersonalizationDto.clientId} no trobat`,
         );
       }
     }
@@ -83,9 +60,7 @@ export class PersonalizationsService {
     }
 
     const personalization = this.personalizationRepository.create({
-      code: createPersonalizationDto.code,
       client,
-      workshop,
       personalizationType,
       description: createPersonalizationDto.description,
       workToDo: createPersonalizationDto.workToDo || null,
@@ -111,7 +86,7 @@ export class PersonalizationsService {
 
   async findAll(): Promise<Personalization[]> {
     return this.personalizationRepository.find({
-      relations: ['client', 'workshop', 'personalizationType'],
+      relations: ['client', 'personalizationType'],
       order: { entryDate: 'DESC', createdAt: 'DESC' },
     });
   }
@@ -119,7 +94,7 @@ export class PersonalizationsService {
   async findOne(id: string): Promise<Personalization> {
     const personalization = await this.personalizationRepository.findOne({
       where: { id },
-      relations: ['client', 'workshop', 'personalizationType'],
+      relations: ['client', 'personalizationType'],
     });
 
     if (!personalization) {
@@ -135,50 +110,21 @@ export class PersonalizationsService {
   ): Promise<Personalization> {
     const personalization = await this.findOne(id);
 
-    if (
-      updatePersonalizationDto.code &&
-      updatePersonalizationDto.code !== personalization.code
-    ) {
-      const existing = await this.personalizationRepository.findOne({
-        where: { code: updatePersonalizationDto.code },
-      });
-
-      if (existing) {
-        throw new ConflictException(
-          `Ja existe una personalització amb el codi ${updatePersonalizationDto.code}`,
-        );
-      }
-    }
-
     if (updatePersonalizationDto.clientId !== undefined) {
-      const client = await this.clientRepository.findOne({
-        where: { id: updatePersonalizationDto.clientId },
-      });
-
-      if (!client) {
-        throw new NotFoundException(
-          `Client amb ID ${updatePersonalizationDto.clientId} no trobat`,
-        );
-      }
-
-      personalization.client = client;
-    }
-
-    if (updatePersonalizationDto.workshopId !== undefined) {
-      if (updatePersonalizationDto.workshopId === null) {
-        personalization.workshop = null;
+      if (updatePersonalizationDto.clientId === null) {
+        personalization.client = null;
       } else {
-        const workshop = await this.workshopRepository.findOne({
-          where: { id: updatePersonalizationDto.workshopId },
+        const client = await this.clientRepository.findOne({
+          where: { id: updatePersonalizationDto.clientId },
         });
 
-        if (!workshop) {
+        if (!client) {
           throw new NotFoundException(
-            `Taller amb ID ${updatePersonalizationDto.workshopId} no trobat`,
+            `Client amb ID ${updatePersonalizationDto.clientId} no trobat`,
           );
         }
 
-        personalization.workshop = workshop;
+        personalization.client = client;
       }
     }
 
@@ -210,7 +156,6 @@ export class PersonalizationsService {
     }
 
     Object.assign(personalization, {
-      code: updatePersonalizationDto.code ?? personalization.code,
       description:
         updatePersonalizationDto.description ?? personalization.description,
       workToDo: updatePersonalizationDto.workToDo ?? personalization.workToDo,
@@ -252,15 +197,14 @@ export class PersonalizationsService {
     const queryBuilder = this.personalizationRepository
       .createQueryBuilder('personalization')
       .leftJoinAndSelect('personalization.client', 'client')
-      .leftJoinAndSelect('personalization.workshop', 'workshop')
       .leftJoinAndSelect(
         'personalization.personalizationType',
         'personalizationType',
       );
 
-    if (searchDto.code) {
-      queryBuilder.andWhere('personalization.code LIKE :code', {
-        code: `%${searchDto.code}%`,
+    if (searchDto.description) {
+      queryBuilder.andWhere('personalization.description ILIKE :description', {
+        description: `%${searchDto.description}%`,
       });
     }
 
@@ -270,23 +214,11 @@ export class PersonalizationsService {
       });
     }
 
-    if (searchDto.workshopId) {
-      queryBuilder.andWhere('personalization.workshop.id = :workshopId', {
-        workshopId: searchDto.workshopId,
-      });
-    }
-
     if (searchDto.clientName) {
       queryBuilder.andWhere(
         '(client.name ILIKE :clientName OR client.surname ILIKE :clientName)',
         { clientName: `%${searchDto.clientName}%` },
       );
-    }
-
-    if (searchDto.workshopName) {
-      queryBuilder.andWhere('workshop.name ILIKE :workshopName', {
-        workshopName: `%${searchDto.workshopName}%`,
-      });
     }
 
     if (searchDto.entryDateFrom && searchDto.entryDateTo) {

@@ -3,23 +3,15 @@ import { IsOptional, IsString, IsDateString, IsUUID } from 'class-validator';
 export class SearchPersonalizationDto {
   @IsString()
   @IsOptional()
-  code?: string;
+  description?: string;
 
   @IsUUID()
   @IsOptional()
   clientId?: string;
 
-  @IsUUID()
-  @IsOptional()
-  workshopId?: string;
-
   @IsString()
   @IsOptional()
   clientName?: string;
-
-  @IsString()
-  @IsOptional()
-  workshopName?: string;
 
   @IsDateString()
   @IsOptional()
