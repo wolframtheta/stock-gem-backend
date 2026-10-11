@@ -5,6 +5,7 @@ import {
   IsEmail,
   MaxLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateClientDto {
   @IsString()
@@ -17,10 +18,11 @@ export class CreateClientDto {
   @MaxLength(255)
   surname?: string;
 
+  @Transform(({ value }) => (value === '' ? null : value))
   @IsEmail()
   @IsOptional()
   @MaxLength(255)
-  email?: string;
+  email?: string | null;
 
   @IsString()
   @IsOptional()
