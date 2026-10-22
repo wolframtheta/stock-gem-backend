@@ -89,6 +89,15 @@ export class FairsController {
     );
   }
 
+  @Get(':id/statistics/articles-summary')
+  getArticlesSummary(
+    @Param('id') id: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.statisticsService.getFairArticlesSummary(id, from, to);
+  }
+
   @Get(':id/statistics/personalizations-time-series')
   getPersonalizationsTimeSeries(
     @Param('id') id: string,

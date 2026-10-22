@@ -547,6 +547,39 @@ export class StatisticsService {
     return this.buildTimeSeriesResponse(periods, seriesMap);
   }
 
+  async getFairArticlesSummary(
+    fairId: string,
+    from?: string,
+    to?: string,
+  ): Promise<{ id: string; name: string; amount: number; quantity: number }[]> {
+    const fair = await this.fairRepository.findOne({ where: { id: fairId } });
+    if (!fair) throw new NotFoundException('Fira no trobada');
+    const { start, end } = this.parseDateRange(
+      from ?? fair.startDate.toString(),
+      to ?? fair.endDate.toString(),
+    );
+    const rows = await this.saleItemRepository
+      .createQueryBuilder('si')
+      .innerJoin('si.sale', 's')
+      .innerJoin('si.article', 'a')
+      .select('si.article_id', 'id')
+      .addSelect('a.name', 'name')
+      .addSelect('SUM(si.total_price)', 'amount')
+      .addSelect('SUM(si.quantity)', 'quantity')
+      .where('s.fair_id = :fairId', { fairId })
+      .andWhere('s.sale_date BETWEEN :start AND :end', { start, end })
+      .groupBy('si.article_id')
+      .addGroupBy('a.name')
+      .orderBy('SUM(si.total_price)', 'DESC')
+      .getRawMany();
+    return rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      amount: Number(r.amount),
+      quantity: Number(r.quantity),
+    }));
+  }
+
   async getFairPersonalizationsTimeSeries(
     fairId: string,
     from?: string,
